@@ -426,8 +426,10 @@ const defaultData = {
   luggage: {},         // 行李：{ [itemId]: true }
   luggageDays: 5,      // 行程天数
   luggageDest: 'kr',   // kr / jp / both
-  luggageCustom: [],   // 行李自定义项：[{id, group, title, note, order}]
+  luggageCustom: [],   // 行李自定义项：[{id, group, title, note}]
   luggageHidden: [],   // 默认行李项中被隐藏的 id（可恢复）
+  luggageRename: {},   // 默认行李项改名：{ [id]: {title, note, group} }
+  luggageDestText: '', // 目的地（自由文本）
   cities: [],          // 城市迷雾：[{id,country,city,photo(dataURL),date,note,unlocked}]
   citiesView: 'list',  // 城市视图：'list' | 'grid'
   books: [],           // 读书：[{id,title,author,note,date,cat}]
@@ -717,38 +719,38 @@ window.initModules = function(){
   });
 
   /* ====================================================
-     2. 行李檢查清單（韓國 / 日本）
-     可依目的地與天數調整
+     2. 行李檢查清單（自由目的地 + 可編輯項目）
+     可自由增刪改項目、目地名稱；支援一鍵全選 / 一鍵清除
   ==================================================== */
   const luggageBase = [
-    {grp:'📄 證件與財務', icon:'📄', items:[
+    {grp:'📄 證件與財務', items:[
       {id:'l_pass',title:'護照（效期 > 6 個月）',note:'出發前再確認一次',tags:[{t:'必帶',c:'must'}]},
-      {id:'l_visa',title:'簽證 / K-ETA / JESTA（依國籍）',note:'台灣赴韓需 K-ETA（免費申請）；赴日免簽',tags:[{t:'必帶',c:'must'}]},
+      {id:'l_visa',title:'簽證 / 入境許可（依國籍）',note:'出發前查清楚目的地規定'},
       {id:'l_tix',title:'機票、住宿、保險證明',note:'截圖存手機 + 紙本備份'},
-      {id:'l_cash',title:'當地現金 + 信用卡',note:'韓國多數可刷；日本現金仍是主流，備足日圓'},
+      {id:'l_cash',title:'當地現金 + 信用卡',note:'確認目的地的支付習慣'},
       {id:'l_lic',title:'國際駕照（若要租車）',note:'僅租車需要'},
     ]},
-    {grp:'🔌 電子與充電', icon:'🔌', items:[
-      {id:'l_adapter',title:'轉接頭',note:'韓國/日本皆為 A 型（兩扁腳），與台灣相同，多數不需變壓',tags:[{t:'小提醒',c:'tip'}]},
+    {grp:'🔌 電子與充電', items:[
+      {id:'l_adapter',title:'轉接頭 / 變壓器',note:'查目的地插頭規格與電壓',tags:[{t:'小提醒',c:'tip'}]},
       {id:'l_power',title:'行動電源',note:'隨身攜帶，機場租借貴'},
       {id:'l_cable',title:'充電線 + 插頭',note:'多帶一條備用'},
-      {id:'l_esim',title:'eSIM / 漫遊上網',note:'出發前買好，落地即用（韓日都很順）'},
-      {id:'l_head',title:'轉接耳機/降噪耳機',note:'長途航班神器'},
+      {id:'l_esim',title:'eSIM / 漫遊上網',note:'出發前買好，落地即用'},
+      {id:'l_head',title:'耳機 / 降噪耳機',note:'長途航班神器'},
     ]},
-    {grp:'👕 衣物', icon:'👕', items:[
+    {grp:'👕 衣物', items:[
       {id:'l_cloth',title:'上衣 / 褲裝（按天數）',note:'參考下方天數自動估算數量'},
       {id:'l_under',title:'內衣褲 / 襪（按天數+1）'},
-      {id:'l_outer',title:'外套（依季節）',note:'韓國冬季嚴寒需羽絨；日本夏熱冬雪差異大'},
-      {id:'l_shoe',title:'舒適走路鞋 + 拖鞋',note:'韓國旅宿多無拖鞋；日本溫泉需單腳'},
-      {id:'l_rain',title:'折疊傘 / 雨衣',note:'韓日梅雨與突發降雨常見'},
+      {id:'l_outer',title:'外套（依季節）',note:'依目的地氣候挑選'},
+      {id:'l_shoe',title:'舒適走路鞋 + 拖鞋'},
+      {id:'l_rain',title:'折疊傘 / 雨衣',note:'突發降雨常見'},
     ]},
-    {grp:'🧴 洗漱與保養', icon:'🧴', items:[
-      {id:'l_toiletry',title:'牙刷/牙膏/洗面乳（旅行組）',note:'韓國飯店常不提供牙刷'},
-      {id:'l_sun',title:'防曬 + 保濕',note:'韓國紫外線強；日本乾燥也要保濕'},
+    {grp:'🧴 洗漱與保養', items:[
+      {id:'l_toiletry',title:'牙刷/牙膏/洗面乳（旅行組）'},
+      {id:'l_sun',title:'防曬 + 保濕'},
       {id:'l_med',title:'個人藥品 + 常備藥',note:'感冒藥、腸胃藥、止痛、OK繃'},
-      {id:'l_mask',title:'口罩（視需求）',note:'空污/人多場所備用'},
+      {id:'l_mask',title:'口罩（視需求）'},
     ]},
-    {grp:'🎒 隨身與其他', icon:'🎒', items:[
+    {grp:'🎒 隨身與其他', items:[
       {id:'l_passbag',title:'隨身證件袋',note:'過海關一路好拿'},
       {id:'l_snack',title:'轉機/長途零食飲水',note:'飛機上補充'},
       {id:'l_pen',title:'筆（填寫入境單）'},
@@ -756,44 +758,66 @@ window.initModules = function(){
     ]},
   ];
 
-  // 目的地差異提示
-  const destNote = {
-    kr:`<div class="card" style="border-color:rgba(255,126,182,.4)">
-        <h3>🇰🇷 韓國專屬提醒</h3>
-        <p class="hint">• 插頭 A 型（同台灣），電壓 220V，多數 3C 支援 100–240V 免變壓<br>
-        • T-money / 交通卡可先辦；地鐵超方便<br>
-        • 冬季（12–2月）極冷，務必羽絨+暖暖包<br>
-        • 飯店多不提供牙刷/梳子，自備</p></div>`,
-    jp:`<div class="card" style="border-color:rgba(90,209,201,.4)">
-        <h3>🇯🇵 日本專屬提醒</h3>
-        <p class="hint">• 插頭 A 型（同台灣），電壓 100V，吹風機等注意電壓<br>
-        • 現金仍是主流，備足日圓（便利商店/小店）<br>
-        • 溫泉需裸湯，自備小毛巾；多數旅宿有拖鞋<br>
-        • 垃圾分類嚴格，隨身帶小垃圾袋</p></div>`,
-    both:`<div class="card" style="border-color:rgba(124,140,255,.4)">
-        <h3>🇰🇷🇯🇵 韓日皆往提醒</h3>
-        <p class="hint">• 兩國插頭皆 A 型、與台灣相同，帶一個萬用轉接即可<br>
-        • 韓國偏刷卡通、日本偏現金 → 兩者都準備<br>
-        • 留意兩國季節與溫差，外套按最冷地點帶</p></div>`
-  };
+  // 目的地專屬提醒（依關鍵字自動匹配，不侷限國家）
+  const destNotes = [
+    {kw:['韓','korea','kr'], html:`<div class="card" style="border-color:rgba(255,126,182,.4)">
+      <h3>🇰🇷 韓國相關提醒</h3>
+      <p class="hint">• 插頭 A 型（同台灣），電壓 220V，多數 3C 支援 100–240V 免變壓<br>
+      • T-money / 交通卡可先辦；地鐵超方便<br>
+      • 冬季（12–2月）極冷，務必羽絨+暖暖包<br>
+      • 飯店多不提供牙刷/梳子，自備</p></div>`},
+    {kw:['日','japan','jp'], html:`<div class="card" style="border-color:rgba(90,209,201,.4)">
+      <h3>🇯🇵 日本相關提醒</h3>
+      <p class="hint">• 插頭 A 型（同台灣），電壓 100V，吹風機等注意電壓<br>
+      • 現金仍是主流，備足日圓（便利商店/小店）<br>
+      • 溫泉需裸湯，自備小毛巾；多數旅宿有拖鞋<br>
+      • 垃圾分類嚴格，隨身帶小垃圾袋</p></div>`},
+    {kw:['泰','thai','th'], html:`<div class="card" style="border-color:rgba(124,140,255,.4)">
+      <h3>🇹🇭 泰國相關提醒</h3>
+      <p class="hint">• 插頭 A/B/C 型，與台灣大部分相容，帶萬用轉接更保險<br>
+      • 氣候炎熱潮濕，防曬 + 防蚊液必備<br>
+      • 便利店 7-11/Truemoney 很方便，可辦旅遊 eSIM<br>
+      • 尊重皇室與宗教場所穿著</p></div>`},
+    {kw:['歐','europe','eu'], html:`<div class="card" style="border-color:rgba(255,205,55,.5)">
+      <h3>🌍 歐洲相關提醒</h3>
+      <p class="hint">• 多數國家用 C/F 型插頭、電壓 230V，需變壓/轉接<br>
+      • 申根區留意停留天數；英國用 G 型插頭<br>
+      • 歐盟境內多數可刷卡通，備少量歐元/英鎊現金<br>
+      • 插座與台灣不同，轉接頭必帶</p></div>`},
+  ];
+  function getDestNote(text){
+    if(!text) return '';
+    const t = text.toLowerCase();
+    for(const d of destNotes){
+      if(d.kw.some(k=> t.includes(k.toLowerCase()))) return d.html;
+    }
+    return '';
+  }
 
-  const destName={kr:'🇰🇷 韓國',jp:'🇯🇵 日本',both:'🇰🇷🇯🇵 韓國+日本'};
-
-  function luggageAllItems(){
-    // 返回 [{id, title, note, tags, group, isCustom}]
+  function luggageBaseItems(){
+    // 把 base 展平成 [{id,title,note,tags,group,base:true}]，並套用 rename overrides
     const hidden = new Set(WB.DB.luggageHidden||[]);
-    const customs = WB.DB.luggageCustom||[];
     const out = [];
     luggageBase.forEach(g=>{
       g.items.forEach(it=>{
         if(hidden.has(it.id)) return;
-        out.push({id:it.id, title:it.title, note:it.note, tags:it.tags, group:g.grp, isCustom:false});
+        out.push({id:it.id, title:it.title, note:it.note, tags:it.tags, group:g.grp, base:true});
       });
     });
-    customs.forEach(it=>{
-      out.push({id:it.id, title:it.title, note:it.note||'', group:it.group, isCustom:true});
+    const rn = WB.DB.luggageRename||{};
+    return out.map(it=>{
+      const r = rn[it.id];
+      if(r) return {...it, title:r.title, note:r.note, group:r.group};
+      return it;
     });
-    return out;
+  }
+  function luggageCustomItems(){
+    return (WB.DB.luggageCustom||[]).map(it=>({
+      id:it.id, title:it.title, note:it.note||'', group:it.group, base:false
+    }));
+  }
+  function luggageAllItems(){
+    return luggageBaseItems().concat(luggageCustomItems());
   }
   function luggageProgress(){
     const all = luggageAllItems();
@@ -802,75 +826,77 @@ window.initModules = function(){
   }
 
   registerModule('luggage',{
-    name:'行李檢查', icon:'🧳', kittyAct:'travel', desc:'韓國 / 日本出行清單 · 勾選即完成',
+    name:'行李檢查', icon:'🧳', kittyAct:'travel', desc:'自由清單 · 勾選即完成 · 可增刪改',
     badge: luggageProgress,
     render(root){
-      root.innerHTML=`<div class="card">
-        <h3>⚙️ 調整你的行程</h3>
-        <label class="fld">目的地</label>
-        <div class="seg" id="destSeg">
-          <button data-v="kr" class="${WB.DB.luggageDest==='kr'?'on':''}">🇰🇷 韓國</button>
-          <button data-v="jp" class="${WB.DB.luggageDest==='jp'?'on':''}">🇯🇵 日本</button>
-          <button data-v="both" class="${WB.DB.luggageDest==='both'?'on':''}">兩者皆去</button>
-        </div>
-        <label class="fld">行程天數：<b id="daysVal">${WB.DB.luggageDays}</b> 天</label>
-        <input type="range" id="daysRange" min="2" max="30" value="${WB.DB.luggageDays}" style="width:100%"/>
-      </div>`;
-      root.insertAdjacentHTML('beforeend', destNote[WB.DB.luggageDest]||'');
+      const store=WB.DB.luggage;
+      const d=WB.DB.luggageDays;
+      const clothNote=`建議 ${d} 天 → 上衣約 ${Math.ceil(d*0.8)} 件、內衣褲 ${d+1} 套`;
+      const allIds = luggageAllItems().map(x=>x.id);
 
-      // 恢復被隱藏項目提示
+      // 頂部：行程設定 + 一鍵全選/清除
+      root.innerHTML=`<div class="card">
+        <h3>⚙️ 行程設定</h3>
+        <label class="fld">目的地（自由填寫，用於專屬提醒）</label>
+        <input type="text" id="destInput" placeholder="例：韓國首爾 / 日本關西 / 泰國曼谷 / 法國巴黎" value="${esc(WB.DB.luggageDestText||'')}"/>
+        <label class="fld">行程天數：<b id="daysVal">${d}</b> 天</label>
+        <input type="range" id="daysRange" min="2" max="30" value="${d}" style="width:100%"/>
+        <div class="row" style="margin-top:12px">
+          <button class="btn ghost sm" onclick="WB._selectAllLuggage()">☑️ 一鍵全選</button>
+          <button class="btn ghost sm" onclick="WB._clearAllLuggage()">🔲 一鍵清除勾選</button>
+        </div>
+      </div>`;
+      root.insertAdjacentHTML('beforeend', getDestNote(WB.DB.luggageDestText||''));
+
+      // 隱藏項目恢復提示
       const hidden = WB.DB.luggageHidden||[];
       if(hidden.length){
         root.insertAdjacentHTML('beforeend',`<div class="card" style="border-color:var(--line);background:var(--pink-soft)">
-          <p class="hint" style="margin:0">已隱藏 ${hidden.length} 個預設項目
+          <p class="hint" style="margin:0">已隱藏 ${hidden.length} 個項目
           <button class="btn ghost sm" style="margin-left:8px" onclick="WB._restoreAllLuggage()">全部恢復</button></p>
         </div>`);
       }
 
-      // 衣物數量建議
-      const d=WB.DB.luggageDays;
-      const clothNote=`建議 ${d} 天 → 上衣約 ${Math.ceil(d*0.8)} 件、內衣褲 ${d+1} 套`;
-      const store=WB.DB.luggage;
       const hiddenSet = new Set(hidden);
       const customs = WB.DB.luggageCustom||[];
 
-      luggageBase.forEach(g=>{
+      // 把所有項目（含 rename 後的 group）按 group 聚合
+      const all = luggageAllItems();
+      const groupsOrder = luggageBase.map(g=>g.grp);
+      const byGroup = {};
+      all.forEach(it=>{ (byGroup[it.group]=byGroup[it.group]||[]).push(it); });
+      // 保證 base 的 group 順序在前，自訂 group 加在後面
+      const orderedGroups = groupsOrder.concat(Object.keys(byGroup).filter(g=>!groupsOrder.includes(g)));
+
+      orderedGroups.forEach(grp=>{
+        const items = byGroup[grp]; if(!items||!items.length) return;
         const card=document.createElement('div');
         card.className='card';
+        card.dataset.group=grp;
         const kittyStamp = (window.KITTY_IMGS? `<img src="${window.KITTY_IMGS.face}" alt=""/>` : window.KITTY({size:24}));
         let html=`<div class="kitty-stamp">${kittyStamp}</div>
-          <h3>${g.grp}</h3>`;
-        // 默认项
+          <h3>${esc(grp)}</h3>`;
         let visibleCount = 0, doneCount = 0;
-        g.items.forEach(it=>{
-          if(hiddenSet.has(it.id)) return;
+
+        items.forEach(it=>{
           visibleCount++;
           if(store[it.id]) doneCount++;
           const checked=store[it.id]?'checked':'';
+          const isCustom = !it.base;
           const tags=(it.tags||[]).map(t=>`<span class="tag ${t.c}">${t.t}</span>`).join('');
-          let noteHtml = it.note || '';
-          if(g.grp.includes('衣物') && it.id==='l_cloth') noteHtml = clothNote;
-          html+=`<label class="check ${store[it.id]?'done':''}" data-id="${it.id}">
+          let noteHtml = (grp.includes('衣物') && it.id==='l_cloth')? clothNote : (it.note||'');
+          if(isCustom) noteHtml = it.note||'';
+          html+=`<label class="check ${isCustom?'custom':''} ${store[it.id]?'done':''}" data-id="${it.id}">
             <input type="checkbox" ${checked}/>
             <div class="ct"><div class="t">${esc(it.title)}</div>
             ${noteHtml?`<div class="n">${esc(noteHtml)}</div>`:''}
-            ${tags?`<div>${tags}</div>`:''}</div>
-            <button class="item-act" onclick="event.preventDefault();WB._hideLuggage('${it.id}')" title="隱藏">✕</button>
-          </label>`;
-        });
-        // 自定义项
-        customs.filter(it=>it.group===g.grp).forEach(it=>{
-          visibleCount++;
-          if(store[it.id]) doneCount++;
-          const checked=store[it.id]?'checked':'';
-          html+=`<label class="check custom ${store[it.id]?'done':''}" data-id="${it.id}">
-            <input type="checkbox" ${checked}/>
-            <div class="ct"><div class="t">${esc(it.title)}</div>
-            ${it.note?`<div class="n">${esc(it.note)}</div>`:''}
-            <span class="tag tip">自訂</span></div>
+            ${tags?`<div>${tags}</div>`:''}
+            ${isCustom?`<span class="tag tip">自訂</span>`:''}</div>
             <div class="item-ops">
               <button class="item-act" onclick="event.preventDefault();WB._editLuggage('${it.id}')" title="編輯">✏️</button>
-              <button class="item-act" onclick="event.preventDefault();WB._delLuggage('${it.id}')" title="刪除">🗑</button>
+              ${isCustom
+                ? `<button class="item-act" onclick="event.preventDefault();WB._delLuggage('${it.id}')" title="刪除">🗑</button>`
+                : `<button class="item-act" onclick="event.preventDefault();WB._hideLuggage('${it.id}')" title="隱藏">✕</button>`}
             </div>
           </label>`;
         });
@@ -880,11 +906,11 @@ window.initModules = function(){
           <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
           <div class="progress-label"><span>${doneCount}/${visibleCount} 完成</span><span>${pct}%</span></div>
         </div>
-        <button class="add-item" onclick="WB._addLuggage('${g.grp}')">＋ 新增項目到「${g.grp.replace(/^.\s/,'')}」</button>`;
+        <button class="add-item" onclick="WB._addLuggage('${grp}')">＋ 新增項目到「${grp.replace(/^.\s/,'')}」</button>`;
         card.innerHTML = html;
         root.appendChild(card);
 
-        // 勾選交互（默认项 + 自定义项）
+        // 勾選交互
         card.querySelectorAll('.check input[type=checkbox]').forEach(inp=>{
           inp.onchange=(e)=>{
             const lab = e.target.closest('.check');
@@ -892,7 +918,6 @@ window.initModules = function(){
             store[id] = e.target.checked;
             WB.save();
             lab.classList.toggle('done', e.target.checked);
-            // 更新进度条
             const checks = card.querySelectorAll('.check');
             const d2 = Array.from(checks).filter(x=>x.classList.contains('done')).length;
             const p2 = Math.round(d2/checks.length*100);
@@ -904,31 +929,30 @@ window.initModules = function(){
       });
 
       // 交互
-      $$('#destSeg button').forEach(b=>b.onclick=()=>{
-        WB.DB.luggageDest=b.dataset.v; WB.save(); WB.go('luggage');
-      });
-      $('#daysRange').oninput=(e)=>{
-        WB.DB.luggageDays=+e.target.value; $('#daysVal').textContent=e.target.value;
-      };
+      $('#destInput').oninput=(e)=>{ WB.DB.luggageDestText=e.target.value; };
+      $('#destInput').onchange=()=>{ WB.save(); WB.go('luggage'); };
+      $('#daysRange').oninput=(e)=>{ WB.DB.luggageDays=+e.target.value; $('#daysVal').textContent=e.target.value; };
       $('#daysRange').onchange=()=>{ WB.save(); WB.go('luggage'); };
     }
   });
 
-  /* ---------- 行李自定义项目 API ---------- */
+  /* ---------- 行李項目 API（基礎項也可改名/隱藏；自訂項可增刪改） ---------- */
   WB._addLuggage = function(group){
     WB._luggageEditing = null;
     WB._luggageGroup = group;
     openLuggageModal();
   };
   WB._editLuggage = function(id){
-    const it = (WB.DB.luggageCustom||[]).find(x=>x.id===id);
+    const base = luggageBaseItems().find(x=>x.id===id);
+    const cust = luggageCustomItems().find(x=>x.id===id);
+    const it = base || cust;
     if(!it) return;
-    WB._luggageEditing = it;
+    WB._luggageEditing = {id, isBase: !!base, group: it.group, title: it.title, note: it.note||''};
     WB._luggageGroup = it.group;
     openLuggageModal();
   };
   WB._delLuggage = function(id){
-    if(!confirm('確定刪除這個自訂項目？')) return;
+    if(!confirm('確定刪除這個項目？')) return;
     WB.DB.luggageCustom = (WB.DB.luggageCustom||[]).filter(x=>x.id!==id);
     delete WB.DB.luggage[id];
     WB.save(); WB.go('luggage'); WB.toast('已刪除 🗑');
@@ -942,33 +966,52 @@ window.initModules = function(){
     WB.DB.luggageHidden = [];
     WB.save(); WB.go('luggage'); WB.toast('已全部恢復');
   };
+  WB._selectAllLuggage = function(){
+    luggageAllItems().forEach(it=>{ WB.DB.luggage[it.id]=true; });
+    WB.save(); WB.go('luggage'); WB.toast('已全部勾選 ☑️');
+  };
+  WB._clearAllLuggage = function(){
+    luggageAllItems().forEach(it=>{ WB.DB.luggage[it.id]=false; });
+    WB.save(); WB.go('luggage'); WB.toast('已清除所有勾選 🔲');
+  };
   WB._saveLuggage = function(){
     const title = $('#mLTitle').value.trim();
     const note = $('#mLNote').value.trim();
+    const grp = $('#mLGroup')? $('#mLGroup').value : WB._luggageGroup;
     if(!title){ WB.toast('請填寫項目名稱'); return; }
     if(WB._luggageEditing){
-      Object.assign(WB._luggageEditing, {title, note});
+      const ed = WB._luggageEditing;
+      if(ed.isBase){
+        // 基礎項改名：存到 overrides
+        if(!WB.DB.luggageRename) WB.DB.luggageRename={};
+        WB.DB.luggageRename[ed.id] = {title, note, group:grp};
+      } else {
+        const it = (WB.DB.luggageCustom||[]).find(x=>x.id===ed.id);
+        if(it){ it.title=title; it.note=note; it.group=grp; }
+      }
     } else {
       WB.DB.luggageCustom = WB.DB.luggageCustom||[];
       WB.DB.luggageCustom.push({
         id:'lc_'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
-        group: WB._luggageGroup,
-        title, note
+        group: grp, title, note
       });
     }
     WB._luggageEditing = null;
     WB.save(); WB._closeModal(); WB.go('luggage');
-    WB.toast(WB._luggageEditing===null?'已新增 ✅':'已更新 ✅');
+    WB.toast('已儲存 ✅');
   };
 
   function openLuggageModal(){
     const e = WB._luggageEditing;
-    const group = WB._luggageGroup;
+    const groups = luggageBase.map(g=>g.grp);
+    const groupOpts = groups.map(g=>`<option value="${esc(g)}" ${e&&e.group===g?'selected':(WB._luggageGroup===g?'selected':'')}>${esc(g)}</option>`).join('');
     const root = $('#modalRoot');
     root.innerHTML=`<div class="modal-mask" onclick="if(event.target===this)WB._closeModal()">
       <div class="modal">
         <button class="close" onclick="WB._closeModal()">✕</button>
-        <h3>${e?'編輯自訂項目':'新增到「'+group+'」'}</h3>
+        <h3>${e?(e.isBase?'重新命名預設項目':'編輯項目'):'新增項目'}</h3>
+        <label class="fld">分組</label>
+        <select id="mLGroup">${groupOpts}</select>
         <label class="fld">項目名稱</label>
         <input type="text" id="mLTitle" placeholder="例：過夜小包 / 紀念品購物袋" value="${e?esc(e.title):''}"/>
         <label class="fld">備註（選填）</label>
@@ -978,6 +1021,16 @@ window.initModules = function(){
         </div>
       </div></div>`;
     setTimeout(()=>$('#mLTitle').focus(), 100);
+  }
+
+  // 套用 rename overrides 到 base 項目
+  function applyLuggageRename(items){
+    const rn = WB.DB.luggageRename||{};
+    return items.map(it=>{
+      const r = rn[it.id];
+      if(r) return {...it, title:r.title, note:r.note, group:r.group, renamed:true};
+      return it;
+    });
   }
 
   /* ====================================================
