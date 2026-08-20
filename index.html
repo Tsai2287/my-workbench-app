@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="我的工作台" />
+<meta name="theme-color" content="#1f2440" />
+<title>我的工作台</title>
+
+
+<style>
+  :root{
+    --bg:#11142a; --bg2:#1a1f3d; --panel:#1f2440; --panel2:#262c52;
+    --line:#333a66; --txt:#e8ebff; --sub:#9aa2cf; --muted:#6b73a3;
+    --accent:#7c8cff; --accent2:#5ad1c9; --good:#4fd18b; --warn:#ffcf5c;
+    --pink:#ff7eb6; --shadow:0 8px 30px rgba(0,0,0,.45);
+    --radius:16px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;height:100%;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Helvetica Neue",sans-serif;
+    background:linear-gradient(160deg,var(--bg),var(--bg2));
+    color:var(--txt); overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  /* 布局 */
+  .app{display:flex;height:100vh;height:100dvh;}
+  /* 侧栏 */
+  .sidebar{
+    width:240px; min-width:240px; background:rgba(15,18,40,.92);
+    border-right:1px solid var(--line); display:flex; flex-direction:column;
+    padding:18px 12px; gap:6px; backdrop-filter:blur(8px);
+  }
+  .brand{display:flex;align-items:center;gap:10px;padding:6px 10px 14px;}
+  .brand .logo{width:34px;height:34px;border-radius:10px;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:var(--shadow);}
+  .brand h1{font-size:16px;margin:0;font-weight:700;letter-spacing:.5px;}
+  .brand small{display:block;color:var(--muted);font-size:11px;font-weight:400;}
+  .nav{display:flex;flex-direction:column;gap:4px;flex:1;overflow-y:auto;}
+  .nav-item{
+    display:flex;align-items:center;gap:12px;padding:13px 12px;border-radius:12px;
+    color:var(--sub);font-size:15px;cursor:pointer;transition:.18s;border:1px solid transparent;
+  }
+  .nav-item .ico{font-size:19px;width:24px;text-align:center;}
+  .nav-item .badge{margin-left:auto;font-size:11px;background:var(--panel2);color:var(--sub);
+    padding:2px 8px;border-radius:20px;}
+  .nav-item:active{transform:scale(.98);}
+  .nav-item.active{background:linear-gradient(135deg,rgba(124,140,255,.22),rgba(90,209,201,.12));
+    color:#fff;border-color:rgba(124,140,255,.4);}
+  .nav-item.active .badge{background:var(--accent);color:#0c1030;}
+  .side-foot{padding:10px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px;}
+  .btn-mini{font-size:13px;padding:9px;border-radius:10px;border:1px solid var(--line);
+    background:var(--panel2);color:var(--txt);text-align:center;cursor:pointer;transition:.15s;}
+  .btn-mini:active{transform:scale(.97);}
+  /* 主内容 */
+  .main{flex:1;display:flex;flex-direction:column;min-width:0;}
+  .topbar{padding:16px 20px 10px;display:flex;align-items:center;gap:12px;}
+  .topbar h2{margin:0;font-size:20px;font-weight:700;}
+  .topbar .desc{color:var(--sub);font-size:13px;margin-top:2px;}
+  .topbar .menu-btn{display:none;font-size:22px;background:none;border:none;color:var(--txt);}
+  .content{flex:1;overflow-y:auto;padding:6px 20px 40px;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:16px 18px;margin-bottom:14px;box-shadow:var(--shadow);}
+  .card h3{margin:0 0 4px;font-size:16px;}
+  .card .hint{color:var(--sub);font-size:13px;margin:0 0 12px;}
+  /* 进度条 */
+  .progress-wrap{margin:6px 0 2px;}
+  .progress-track{height:9px;background:var(--panel2);border-radius:20px;overflow:hidden;}
+  .progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));
+    border-radius:20px;transition:width .4s;}
+  .progress-label{font-size:12px;color:var(--sub);margin-top:6px;display:flex;justify-content:space-between;}
+  /* 检查项 */
+  .check{display:flex;align-items:flex-start;gap:12px;padding:11px 4px;border-bottom:1px solid rgba(255,255,255,.05);}
+  .check:last-child{border-bottom:none;}
+  .check input{appearance:none;width:22px;height:22px;border:2px solid var(--line);border-radius:7px;
+    flex-shrink:0;margin-top:1px;cursor:pointer;position:relative;transition:.15s;background:var(--panel2);}
+  .check input:checked{background:var(--good);border-color:var(--good);}
+  .check input:checked::after{content:"✓";position:absolute;inset:0;color:#0c1030;font-size:15px;
+    display:flex;align-items:center;justify-content:center;font-weight:800;}
+  .check .ct{flex:1;}
+  .check .ct .t{font-size:15px;}
+  .check.done .ct .t{color:var(--muted);text-decoration:line-through;}
+  .check .ct .n{font-size:12px;color:var(--sub);margin-top:3px;line-height:1.4;}
+  .tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:20px;margin-right:6px;margin-top:4px;}
+  .tag.lv{background:rgba(124,140,255,.18);color:var(--accent);}
+  .tag.tip{background:rgba(90,209,201,.16);color:var(--accent2);}
+  .tag.must{background:rgba(255,126,182,.18);color:var(--pink);}
+  /* 通用按钮 */
+  .btn{font-size:14px;padding:11px 16px;border-radius:12px;border:none;cursor:pointer;
+    background:linear-gradient(135deg,var(--accent),#6a7bff);color:#0c1030;font-weight:700;transition:.15s;}
+  .btn:active{transform:scale(.97);}
+  .btn.ghost{background:var(--panel2);color:var(--txt);border:1px solid var(--line);font-weight:500;}
+  .btn.sm{padding:8px 13px;font-size:13px;}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+  .seg{display:flex;background:var(--panel2);border-radius:12px;padding:4px;gap:4px;flex-wrap:wrap;}
+  .seg button{flex:1;min-width:70px;border:none;background:none;color:var(--sub);padding:9px 10px;
+    border-radius:9px;font-size:13px;cursor:pointer;transition:.15s;white-space:nowrap;}
+  .seg button.on{background:var(--accent);color:#0c1030;font-weight:700;}
+  /* 表单 */
+  input[type=text],textarea,select{width:100%;background:var(--panel2);border:1px solid var(--line);
+    color:var(--txt);border-radius:10px;padding:11px 12px;font-size:14px;font-family:inherit;outline:none;}
+  input:focus,textarea:focus,select:focus{border-color:var(--accent);}
+  textarea{resize:vertical;min-height:70px;}
+  label.fld{display:block;font-size:12px;color:var(--sub);margin:10px 0 5px;}
+  /* 城市迷雾 */
+  .fog-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:14px;}
+  .fog-cell{position:relative;border-radius:14px;overflow:hidden;aspect-ratio:3/4;
+    background:var(--panel2);border:1px solid var(--line);cursor:pointer;}
+  .fog-cell img{width:100%;height:100%;object-fit:cover;display:block;}
+  .fog-cell .fog{position:absolute;inset:0;background:rgba(12,16,40,.86);
+    backdrop-filter:blur(7px);display:flex;flex-direction:column;align-items:center;justify-content:center;
+    color:var(--muted);font-size:13px;gap:6px;transition:.3s;}
+  .fog-cell.unlocked .fog{opacity:0;pointer-events:none;}
+  .fog-cell .meta{position:absolute;left:0;right:0;bottom:0;padding:10px;
+    background:linear-gradient(transparent,rgba(0,0,0,.75));font-size:13px;}
+  .fog-cell .meta b{font-size:14px;display:block;}
+  .fog-cell .meta span{color:var(--accent2);font-size:11px;}
+  .add-cell{border:2px dashed var(--line);display:flex;align-items:center;justify-content:center;
+    color:var(--sub);font-size:30px;background:transparent;}
+  /* 读书 */
+  .book{border:1px solid var(--line);border-radius:14px;padding:14px;background:var(--panel2);}
+  .book h4{margin:0 0 4px;font-size:15px;}
+  .book .by{color:var(--sub);font-size:12px;margin-bottom:8px;}
+  .book .note{font-size:13px;color:var(--txt);line-height:1.5;white-space:pre-wrap;}
+  .book .ops{display:flex;gap:8px;margin-top:10px;}
+  /* 隐藏 */
+  .hidden{display:none!important;}
+  .empty{color:var(--muted);text-align:center;padding:40px 10px;font-size:14px;}
+  /* Toast */
+  .toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:var(--panel2);border:1px solid var(--accent);color:var(--txt);padding:12px 20px;
+    border-radius:30px;font-size:14px;opacity:0;pointer-events:none;transition:.3s;z-index:99;box-shadow:var(--shadow);}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  /* 弹层 */
+  .modal-mask{position:fixed;inset:0;background:rgba(5,8,20,.7);backdrop-filter:blur(4px);
+    z-index:80;display:flex;align-items:flex-end;justify-content:center;}
+  .modal{background:var(--panel);width:100%;max-width:480px;border-radius:20px 20px 0 0;
+    padding:20px;max-height:88vh;overflow-y:auto;border-top:1px solid var(--line);}
+  .modal h3{margin:0 0 14px;}
+  .modal .close{float:right;font-size:22px;color:var(--sub);cursor:pointer;background:none;border:none;}
+  /* 移动端抽屉 */
+  @media (max-width:760px){
+    .sidebar{position:fixed;left:0;top:0;bottom:0;z-index:90;transform:translateX(-100%);
+      transition:.28s;box-shadow:var(--shadow);}
+    .sidebar.open{transform:translateX(0);}
+    .topbar .menu-btn{display:block;}
+    .content{padding:6px 14px 40px;}
+    .topbar{padding:14px 14px 6px;}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- 侧栏 -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="logo">🌏</div>
+      <div><h1>我的工作台</h1><small>學習 · 旅行 · 生活</small></div>
+    </div>
+    <nav class="nav" id="nav"></nav>
+    <div class="side-foot">
+      <div class="btn-mini" id="btnExport">⬇️ 匯出備份</div>
+      <div class="btn-mini" id="btnImport">⬆️ 匯入備份</div>
+      <input type="file" id="importFile" accept="application/json" class="hidden" />
+    </div>
+  </aside>
+
+  <!-- 主区 -->
+  <main class="main">
+    <div class="topbar">
+      <button class="menu-btn" id="menuBtn">☰</button>
+      <div>
+        <h2 id="pageTitle">韓文學習</h2>
+        <div class="desc" id="pageDesc"></div>
+      </div>
+    </div>
+    <div class="content" id="content"></div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+<div id="modalRoot"></div>
+
+
+
+<script>
+
+/* ===== app.js ===== */
+/* ============ 我的工作台 app.js ============ */
+(function(){
+'use strict';
+
+/* ---------- 数据存储（纯本地 localStorage） ---------- */
+const KEY = 'my_workbench_v1';
+const defaultData = {
+  korean: {},          // 韩文学习：{ [itemId]: true }
+  luggage: {},         // 行李：{ [itemId]: true }
+  luggageDays: 5,      // 行程天数
+  luggageDest: 'kr',   // kr / jp / both
+  cities: [],          // 城市迷雾：[{id,country,city,photo(dataURL),date,note,unlocked}]
+  books: []            // 读书：[{id,title,author,note,date}]
+};
+let DB = load();
+
+function load(){
+  try{
+    const raw = localStorage.getItem(KEY);
+    if(!raw) return JSON.parse(JSON.stringify(defaultData));
+    const d = JSON.parse(raw);
+    return Object.assign(JSON.parse(JSON.stringify(defaultData)), d);
+  }catch(e){ return JSON.parse(JSON.stringify(defaultData)); }
+}
+function save(){ localStorage.setItem(KEY, JSON.stringify(DB)); }
+
+/* ---------- 工具 ---------- */
+const $ = (s,r=document)=>r.querySelector(s);
+const $$ = (s,r=document)=>Array.from(r.querySelectorAll(s));
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function esc(s){ return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function fmtDate(d){ if(!d) return ''; try{ return new Date(d).toLocaleDateString('zh-Hant'); }catch(e){ return d; } }
+let toastTimer;
+function toast(msg){
+  const t=$('#toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),1800);
+}
+
+/* ---------- 模块注册 ---------- */
+const modules = {};
+function registerModule(id, def){ def.id=id; modules[id]=def; }
+
+/* ---------- 导航渲染 ---------- */
+function renderNav(){
+  const nav = $('#nav'); nav.innerHTML='';
+  Object.values(modules).forEach(m=>{
+    const el=document.createElement('div');
+    el.className='nav-item'+(m.id===current? ' active':'');
+    el.dataset.id=m.id;
+    const badge = m.badge? `<span class="badge">${m.badge()}</span>`:'';
+    el.innerHTML=`<span class="ico">${m.icon}</span><span>${m.name}</span>${badge}`;
+    el.onclick=()=>{ go(m.id); closeSidebar(); };
+    nav.appendChild(el);
+  });
+}
+function refreshBadges(){
+  $$('.nav-item').forEach(el=>{
+    const m=modules[el.dataset.id];
+    if(!m || !m.badge) return;
+    const b=el.querySelector('.badge');
+    const v=m.badge();
+    if(b) b.textContent=v; else renderNav();
+  });
+}
+
+let current='korean';
+function go(id){
+  current=id;
+  const m=modules[id];
+  $('#pageTitle').textContent=m.name;
+  $('#pageDesc').textContent=m.desc||'';
+  $('#content').innerHTML='';
+  renderNav();
+  m.render($('#content'));
+}
+function closeSidebar(){ $('#sidebar').classList.remove('open'); }
+$('#menuBtn').onclick=()=>{ $('#sidebar').classList.toggle('open'); };
+
+/* ---------- 导出/导入 ---------- */
+$('#btnExport').onclick=()=>{
+  const blob=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='workbench-backup-'+new Date().toISOString().slice(0,10)+'.json';
+  a.click(); URL.revokeObjectURL(a.href);
+  toast('已匯出備份檔'); closeSidebar();
+};
+$('#btnImport').onclick=()=>{ $('#importFile').click(); closeSidebar(); };
+$('#importFile').onchange=(e)=>{
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const d=JSON.parse(r.result);
+      DB=Object.assign(JSON.parse(JSON.stringify(defaultData)), d);
+      save(); go(current); toast('備份已匯入 ✅');
+    }catch(err){ toast('檔案格式錯誤'); }
+  };
+  r.readAsText(f); e.target.value='';
+};
+
+/* ---------- 检查项渲染辅助 ---------- */
+function renderCheckList(container, items, store, groupTitle){
+  // items: [{id,title,note,tags:[{t,c}]}]
+  const total=items.length;
+  const done=items.filter(i=>store[i.id]).length;
+  const pct= total? Math.round(done/total*100):0;
+  let html=`<div class="card">
+    <h3>${groupTitle}</h3>
+    <div class="progress-wrap">
+      <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+      <div class="progress-label"><span>${done}/${total} 完成</span><span>${pct}%</span></div>
+    </div>
+    <div style="margin-top:10px">`;
+  items.forEach(it=>{
+    const checked=store[it.id]?'checked':'';
+    const tags=(it.tags||[]).map(t=>`<span class="tag ${t.c}">${t.t}</span>`).join('');
+    html+=`<label class="check ${store[it.id]?'done':''}" data-id="${it.id}">
+      <input type="checkbox" ${checked}/>
+      <div class="ct"><div class="t">${esc(it.title)}</div>
+      ${it.note?`<div class="n">${esc(it.note)}</div>`:''}
+      ${tags?`<div>${tags}</div>`:''}</div></label>`;
+  });
+  html+='</div></div>';
+  container.insertAdjacentHTML('beforeend',html);
+  container.querySelectorAll(`.check`).forEach(l=>{
+    const id=l.dataset.id;
+    l.querySelector('input').onchange=(e)=>{
+      store[id]=e.target.checked; save();
+      l.classList.toggle('done',e.target.checked);
+      // 更新进度
+      const items2=Array.from(container.querySelectorAll('.check'));
+      const d2=items2.filter(x=>x.classList.contains('done')).length;
+      const p2=Math.round(d2/items2.length*100);
+      const card=l.closest('.card');
+      card.querySelector('.progress-fill').style.width=p2+'%';
+      card.querySelector('.progress-label').innerHTML=`<span>${d2}/${items2.length} 完成</span><span>${p2}%</span>`;
+      refreshBadges();
+    };
+  });
+}
+
+/* 暴露给模块 */
+window.WB={ registerModule, go, save, get DB(){return DB;}, set DB(v){DB=v;}, renderCheckList, toast, uid, esc, fmtDate, refreshBadges, $, $$ };
+
+/* 启动 */
+window.addEventListener('DOMContentLoaded',()=>{
+  if(window.initModules) window.initModules();
+  go(current);
+});
+})();
+
+/* ===== modules.js ===== */
+/* ============ 模块定义 modules.js ============ */
+window.initModules = function(){
+  const WB = window.WB;
+  const { registerModule, renderCheckList, $, $$, esc, fmtDate, uid, toast, save } = WB;
+
+  /* ====================================================
+     1. 韓文學習（TOPIK 導向）
+     使用者：會 40 音 + 少量單字，不常開口 → 目標 TOPIK 2~3 級
+     特色：階段化路徑 + 強調「開口說」
+  ==================================================== */
+  const koreanStages = [
+    { id:'s1', title:'① 發音與拼讀鞏固（1–2 週）', icon:'🔤',
+      items:[
+        {id:'k_s1_1',title:'熟練 40 音 + 雙子音/複元音',note:'用「拼讀表」每天快速過一遍，看到就能讀、聽到能寫',tags:[{t:'基礎',c:'lv'}]},
+        {id:'k_s1_2',title:'掌握音變規則',note:'連音、送氣、ㄹ 化、緊音化等 7 大規則',tags:[{t:'重點',c:'must'}]},
+        {id:'k_s1_3',title:'每天朗讀 5 分鐘（開口！）',note:'跟讀韓籍 YT（예: 떡볶이 요리 / 뉴스 읽기），錄下自己對比',tags:[{t:'開口說',c:'tip'}]},
+        {id:'k_s1_4',title:'安裝並每天用發音 App',note:'推薦：Talk To Me In Korean / 반짝한국어 / 多鄰國',tags:[{t:'工具',c:'tip'}]},
+      ]},
+    { id:'s2', title:'② 核心詞彙累積（持續）', icon:'📚',
+      items:[
+        {id:'k_s2_1',title:'TOPIK 初級必考詞 1500 字',note:'按主題背：家庭/工作/健康/交通/天氣，每天 20 字',tags:[{t:'TOPIK',c:'lv'}]},
+        {id:'k_s2_2',title:'製作自己的「工作相關韓文詞庫」',note:'你想在台灣找韓文工作 → 先蒐集：會議/email/客訴/報表 等職場用語',tags:[{t:'就業導向',c:'must'}]},
+        {id:'k_s2_3',title:'用 Anki/單字卡複習',note:'間隔重複，把常忘的標記出來',tags:[{t:'工具',c:'tip'}]},
+        {id:'k_s2_4',title:'每週實際「說出」10 個職場句子',note:'例：회의 자료 준비됐어요 / 이메일 확인 부탁드립니다',tags:[{t:'開口說',c:'tip'}]},
+      ]},
+    { id:'s3', title:'③ 語法與句型（TOPIK 2~3 級核心）', icon:'🧩',
+      items:[
+        {id:'k_s3_1',title:'初級文法 120 條',note:'-아/어요、-는/은、-을/를、-고、-면、-게 되다 等',tags:[{t:'TOPIK',c:'lv'}]},
+        {id:'k_s3_2',title:'連接語尾與敬語區分',note:'해요체 vs 하십시오체 vs 해라체，工作面試/郵件要用對',tags:[{t:'就業導向',c:'must'}]},
+        {id:'k_s3_3',title:'每天寫 3 句韓文日記',note:'用當天學的文法，養成輸出習慣',tags:[{t:'輸出',c:'tip'}]},
+        {id:'k_s3_4',title:'每週 1 次口說練習（找語伴/AI）',note:'用 HelloTalk / 線上語伴，或對 AI 講韓文',tags:[{t:'開口說',c:'tip'}]},
+      ]},
+    { id:'s4', title:'④ 聽力與口說突破', icon:'🎧',
+      items:[
+        {id:'k_s4_1',title:'每天聽 15 分鐘韓語',note:'新聞(연합뉴스)/韓劇/Podcast，先中字再無字',tags:[{t:'聽力',c:'lv'}]},
+        {id:'k_s4_2',title:'影子跟讀（Shadowing）',note:'播放一句立刻跟著說，訓練語感與流利度',tags:[{t:'開口說',c:'tip'}]},
+        {id:'k_s4_3',title:'模仿職場對話',note:'錄音練：電話接聽、簡報開場、客訴應對',tags:[{t:'就業導向',c:'must'}]},
+        {id:'k_s4_4',title:'月度口說自我測驗',note:'用手機錄 1 分鐘自我介紹（韓文），回聽改進',tags:[{t:'檢核',c:'tip'}]},
+      ]},
+    { id:'s5', title:'⑤ TOPIK 應考與求職準備', icon:'🎯',
+      items:[
+        {id:'k_s5_1',title:'下載歷屆試題並每週模考',note:'TOPIK I/II 官方考古題，計時練習',tags:[{t:'TOPIK',c:'lv'}]},
+        {id:'k_s5_2',title:'寫作模板練習（51–54題）',note:'圖表描述、意見文，背 3 套萬用架構',tags:[{t:'TOPIK',c:'lv'}]},
+        {id:'k_s5_3',title:'準備韓文履歷 + 自我介紹稿',note:'鎖定台灣韓商/貿易/免稅產業，目標 TOPIK 3 級+',tags:[{t:'就業導向',c:'must'}]},
+        {id:'k_s5_4',title:'報名下一場 TOPIK 考試',note:'台灣場次查「台北韓國教育院」，先卡位',tags:[{t:'行動',c:'tip'}]},
+      ]},
+  ];
+
+  function koreanProgress(){
+    let d=0,t=0;
+    koreanStages.forEach(s=>s.items.forEach(i=>{t++; if(WB.DB.korean[i.id]) d++;}));
+    return d? `${d}/${t}`:'0';
+  }
+
+  registerModule('korean',{
+    name:'韓文學習', icon:'🇰🇷', desc:'TOPIK 導向 · 從 40 音到韓文工作',
+    badge: koreanProgress,
+    render(root){
+      root.innerHTML=`<div class="card" style="background:linear-gradient(135deg,rgba(124,140,255,.15),rgba(90,209,201,.08));">
+        <h3>🎯 你的目標路徑</h3>
+        <p class="hint" style="margin-bottom:8px">現狀：會 40 音 + 少量單字，不常開口。<br>
+        目標：<b>TOPIK 3 級</b>，足以在台灣從事需韓文的工作（韓商、貿易、免稅、客服）。<br>
+        路徑：發音鞏固 → 詞彙 → 文法 → 聽說突破 → 應考求職。每天至少「開口說」一次是關鍵。</p>
+      </div>`;
+      const store=WB.DB.korean;
+      koreanStages.forEach(s=>{
+        const wrap=document.createElement('div');
+        root.appendChild(wrap);
+        renderCheckList(wrap, s.items, store, `${s.icon} ${s.title}`);
+      });
+    }
+  });
+
+  /* ====================================================
+     2. 行李檢查清單（韓國 / 日本）
+     可依目的地與天數調整
+  ==================================================== */
+  const luggageBase = [
+    {grp:'📄 證件與財務', icon:'📄', items:[
+      {id:'l_pass',title:'護照（效期 > 6 個月）',note:'出發前再確認一次',tags:[{t:'必帶',c:'must'}]},
+      {id:'l_visa',title:'簽證 / K-ETA / JESTA（依國籍）',note:'台灣赴韓需 K-ETA（免費申請）；赴日免簽',tags:[{t:'必帶',c:'must'}]},
+      {id:'l_tix',title:'機票、住宿、保險證明',note:'截圖存手機 + 紙本備份'},
+      {id:'l_cash',title:'當地現金 + 信用卡',note:'韓國多數可刷；日本現金仍是主流，備足日圓'},
+      {id:'l_lic',title:'國際駕照（若要租車）',note:'僅租車需要'},
+    ]},
+    {grp:'🔌 電子與充電', icon:'🔌', items:[
+      {id:'l_adapter',title:'轉接頭',note:'韓國/日本皆為 A 型（兩扁腳），與台灣相同，多數不需變壓',tags:[{t:'小提醒',c:'tip'}]},
+      {id:'l_power',title:'行動電源',note:'隨身攜帶，機場租借貴'},
+      {id:'l_cable',title:'充電線 + 插頭',note:'多帶一條備用'},
+      {id:'l_esim',title:'eSIM / 漫遊上網',note:'出發前買好，落地即用（韓日都很順）'},
+      {id:'l_head',title:'轉接耳機/降噪耳機',note:'長途航班神器'},
+    ]},
+    {grp:'👕 衣物', icon:'👕', items:[
+      {id:'l_cloth',title:'上衣 / 褲裝（按天數）',note:'參考下方天數自動估算數量'},
+      {id:'l_under',title:'內衣褲 / 襪（按天數+1）'},
+      {id:'l_outer',title:'外套（依季節）',note:'韓國冬季嚴寒需羽絨；日本夏熱冬雪差異大'},
+      {id:'l_shoe',title:'舒適走路鞋 + 拖鞋',note:'韓國旅宿多無拖鞋；日本溫泉需單腳'},
+      {id:'l_rain',title:'折疊傘 / 雨衣',note:'韓日梅雨與突發降雨常見'},
+    ]},
+    {grp:'🧴 洗漱與保養', icon:'🧴', items:[
+      {id:'l_toiletry',title:'牙刷/牙膏/洗面乳（旅行組）',note:'韓國飯店常不提供牙刷'},
+      {id:'l_sun',title:'防曬 + 保濕',note:'韓國紫外線強；日本乾燥也要保濕'},
+      {id:'l_med',title:'個人藥品 + 常備藥',note:'感冒藥、腸胃藥、止痛、OK繃'},
+      {id:'l_mask',title:'口罩（視需求）',note:'空污/人多場所備用'},
+    ]},
+    {grp:'🎒 隨身與其他', icon:'🎒', items:[
+      {id:'l_passbag',title:'隨身證件袋',note:'過海關一路好拿'},
+      {id:'l_snack',title:'轉機/長途零食飲水',note:'飛機上補充'},
+      {id:'l_pen',title:'筆（填寫入境單）'},
+      {id:'l_photo',title:'備用證件照（急用）'},
+    ]},
+  ];
+
+  // 目的地差異提示
+  const destNote = {
+    kr:`<div class="card" style="border-color:rgba(255,126,182,.4)">
+        <h3>🇰🇷 韓國專屬提醒</h3>
+        <p class="hint">• 插頭 A 型（同台灣），電壓 220V，多數 3C 支援 100–240V 免變壓<br>
+        • T-money / 交通卡可先辦；地鐵超方便<br>
+        • 冬季（12–2月）極冷，務必羽絨+暖暖包<br>
+        • 飯店多不提供牙刷/梳子，自備</p></div>`,
+    jp:`<div class="card" style="border-color:rgba(90,209,201,.4)">
+        <h3>🇯🇵 日本專屬提醒</h3>
+        <p class="hint">• 插頭 A 型（同台灣），電壓 100V，吹風機等注意電壓<br>
+        • 現金仍是主流，備足日圓（便利商店/小店）<br>
+        • 溫泉需裸湯，自備小毛巾；多數旅宿有拖鞋<br>
+        • 垃圾分類嚴格，隨身帶小垃圾袋</p></div>`,
+    both:`<div class="card" style="border-color:rgba(124,140,255,.4)">
+        <h3>🇰🇷🇯🇵 韓日皆往提醒</h3>
+        <p class="hint">• 兩國插頭皆 A 型、與台灣相同，帶一個萬用轉接即可<br>
+        • 韓國偏刷卡通、日本偏現金 → 兩者都準備<br>
+        • 留意兩國季節與溫差，外套按最冷地點帶</p></div>`
+  };
+
+  const destName={kr:'🇰🇷 韓國',jp:'🇯🇵 日本',both:'🇰🇷🇯🇵 韓國+日本'};
+
+  function luggageProgress(){
+    const all=[]; luggageBase.forEach(g=>g.items.forEach(i=>all.push(i.id)));
+    const d=all.filter(id=>WB.DB.luggage[id]).length;
+    return d?`${d}/${all.length}`:'0';
+  }
+
+  registerModule('luggage',{
+    name:'行李檢查', icon:'🧳', desc:'韓國 / 日本出行清單 · 勾選即完成',
+    badge: luggageProgress,
+    render(root){
+      root.innerHTML=`<div class="card">
+        <h3>⚙️ 調整你的行程</h3>
+        <label class="fld">目的地</label>
+        <div class="seg" id="destSeg">
+          <button data-v="kr" class="${WB.DB.luggageDest==='kr'?'on':''}">🇰🇷 韓國</button>
+          <button data-v="jp" class="${WB.DB.luggageDest==='jp'?'on':''}">🇯🇵 日本</button>
+          <button data-v="both" class="${WB.DB.luggageDest==='both'?'on':''}">兩者皆去</button>
+        </div>
+        <label class="fld">行程天數：<b id="daysVal">${WB.DB.luggageDays}</b> 天</label>
+        <input type="range" id="daysRange" min="2" max="30" value="${WB.DB.luggageDays}" style="width:100%"/>
+      </div>`;
+      root.insertAdjacentHTML('beforeend', destNote[WB.DB.luggageDest]||'');
+
+      // 衣物數量建議
+      const d=WB.DB.luggageDays;
+      const clothNote=`建議 ${d} 天 → 上衣約 ${Math.ceil(d*0.8)} 件、內衣褲 ${d+1} 套`;
+      const store=WB.DB.luggage;
+      luggageBase.forEach(g=>{
+        const wrap=document.createElement('div');
+        let items=g.items;
+        if(g.grp.includes('衣物')){
+          items=g.items.map(it=> it.id==='l_cloth'? {...it, note:clothNote}: it);
+        }
+        wrap._grp=g.grp;
+        root.appendChild(wrap);
+        renderCheckList(wrap, items, store, g.grp);
+      });
+
+      // 交互
+      $$('#destSeg button').forEach(b=>b.onclick=()=>{
+        WB.DB.luggageDest=b.dataset.v; WB.save(); WB.go('luggage');
+      });
+      $('#daysRange').oninput=(e)=>{
+        WB.DB.luggageDays=+e.target.value; $('#daysVal').textContent=e.target.value;
+      };
+      $('#daysRange').onchange=()=>{ WB.save(); WB.go('luggage'); };
+    }
+  });
+
+  /* ====================================================
+     3. 城市迷霧地圖（記錄去過的地方 + 照片，解鎖式）
+  ==================================================== */
+  registerModule('cities',{
+    name:'城市迷霧', icon:'🌫️', desc:'解鎖你去過的國家與城市',
+    badge:()=> WB.DB.cities.filter(c=>c.unlocked).length? `${WB.DB.cities.filter(c=>c.unlocked).length}`:'0',
+    render(root){
+      const cities=WB.DB.cities;
+      let html=`<div class="card" style="background:linear-gradient(135deg,rgba(90,209,201,.12),rgba(124,140,255,.08))">
+        <h3>🌏 我的足跡</h3>
+        <p class="hint">點擊已解鎖的格子看照片與筆記；點「＋」新增一處旅程。
+        上傳手機相簿照片時會自動讀取定位（若照片帶 GPS）。</p>
+        <div class="progress-label" style="margin-top:4px">
+          <span>已解鎖 ${cities.filter(c=>c.unlocked).length} / ${cities.length} 處</span>
+          <span>${cities.length? Math.round(cities.filter(c=>c.unlocked).length/cities.length*100):0}%</span>
+        </div>
+      </div>`;
+      html+=`<div class="fog-grid">`;
+      cities.forEach(c=>{
+        html+=`<div class="fog-cell ${c.unlocked?'unlocked':''}" data-id="${c.id}" onclick="WB._openCity('${c.id}')">
+          ${c.photo?`<img src="${c.photo}" alt=""/>`:''}
+          <div class="fog">🌫️<span>${c.unlocked?'':'未解鎖'}</span></div>
+          <div class="meta"><b>${esc(c.city||'？')}</b><span>${esc(c.country||'')}</span></div>
+        </div>`;
+      });
+      html+=`<div class="fog-cell add-cell" onclick="WB._addCity()">＋</div>`;
+      html+=`</div>`;
+      if(!cities.length) html+=`<div class="empty">還沒有足跡，點「＋」解鎖第一座城市吧 ✈️</div>`;
+      root.innerHTML=html;
+    }
+  });
+
+  /* 新增/編輯城市（含 EXIF 讀取） */
+  WB._addCity=function(){
+    openCityModal(null);
+  };
+  WB._openCity=function(id){
+    const c=WB.DB.cities.find(x=>x.id===id);
+    if(c && c.unlocked) openCityModal(id);
+    else if(c && !c.unlocked){ // 解鎖
+      c.unlocked=true; WB.save(); WB.go('cities'); WB.toast('🌟 已解鎖 '+c.city);
+    }
+  };
+
+  function openCityModal(id){
+    const editing = id? WB.DB.cities.find(x=>x.id===id):null;
+    const root=$('#modalRoot');
+    root.innerHTML=`<div class="modal-mask" onclick="if(event.target===this)WB._closeModal()">
+      <div class="modal">
+        <button class="close" onclick="WB._closeModal()">✕</button>
+        <h3>${editing?'編輯足跡':'新增足跡 ✈️'}</h3>
+        <label class="fld">國家</label>
+        <input type="text" id="mCountry" placeholder="例：日本 / 韓國 / 法國" value="${editing?esc(editing.country):''}"/>
+        <label class="fld">城市</label>
+        <input type="text" id="mCity" placeholder="例：東京 / 首爾 / 巴黎" value="${editing?esc(editing.city):''}"/>
+        <label class="fld">當地照片（從相簿選，可自動抓定位）</label>
+        <input type="file" id="mPhoto" accept="image/*"/>
+        <div id="mPreview" style="margin-top:8px"></div>
+        <label class="fld">日期</label>
+        <input type="date" id="mDate" value="${editing?esc(editing.date||''):''}" style="background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:11px 12px;font-size:14px;width:100%"/>
+        <label class="fld">一句筆記</label>
+        <textarea id="mNote" placeholder="那天的天氣、最喜歡的角落…">${editing?esc(editing.note):''}</textarea>
+        <div class="row" style="margin-top:16px;justify-content:flex-end">
+          ${editing?'<button class="btn ghost sm" onclick="WB._delCity(\''+editing.id+'\')">刪除</button>':''}
+          <button class="btn" onclick="WB._saveCity('${id||''}')">${editing?'儲存':'解鎖並新增'}</button>
+        </div>
+      </div></div>`;
+    if(editing && editing.photo){
+      $('#mPreview').innerHTML=`<img src="${editing.photo}" style="max-width:100%;border-radius:10px;max-height:160px"/>`;
+    }
+    // 選圖：壓縮 + 讀 EXIF 定位
+    $('#mPhoto').onchange=(e)=>{
+      const f=e.target.files[0]; if(!f) return;
+      const reader=new FileReader();
+      reader.onload=()=>{
+        const dataUrl=reader.result;
+        compressImage(dataUrl, 600, (compressed)=>{
+          WB._pendingPhoto=compressed;
+          $('#mPreview').innerHTML=`<img src="${compressed}" style="max-width:100%;border-radius:10px;max-height:160px"/>`;
+        });
+        // 嘗試讀 EXIF GPS
+        readExifLocation(f, (loc)=>{
+          if(loc){
+            if(loc.country) $('#mCountry').value=loc.country;
+            if(loc.city) $('#mCity').value=loc.city;
+            WB.toast('已自動讀取照片定位 📍');
+          }
+        });
+      };
+      reader.readAsDataURL(f);
+    };
+  }
+
+  WB._saveCity=function(id){
+    const country=$('#mCountry').value.trim();
+    const city=$('#mCity').value.trim();
+    const date=$('#mDate').value;
+    const note=$('#mNote').value.trim();
+    const photo=WB._pendingPhoto|| (id? (WB.DB.cities.find(x=>x.id===id)||{}).photo : null);
+    if(!country && !city){ WB.toast('請填寫國家或城市'); return; }
+    if(id){
+      const c=WB.DB.cities.find(x=>x.id===id);
+      Object.assign(c,{country,city,date,note,photo,unlocked:true});
+    }else{
+      WB.DB.cities.push({id:WB.uid(),country,city,date,note,photo,unlocked:true});
+    }
+    WB._pendingPhoto=null; WB.save(); WB._closeModal(); WB.go('cities'); WB.toast('✅ 已儲存');
+  };
+  WB._delCity=function(id){
+    WB.DB.cities=WB.DB.cities.filter(x=>x.id!==id);
+    WB.save(); WB._closeModal(); WB.go('cities'); WB.toast('已刪除');
+  };
+  WB._closeModal=function(){ $('#modalRoot').innerHTML=''; };
+
+  // 圖片壓縮
+  function compressImage(dataUrl, maxW, cb){
+    const img=new Image();
+    img.onload=()=>{
+      const scale=Math.min(1, maxW/img.width);
+      const w=img.width*scale, h=img.height*scale;
+      const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+      cv.getContext('2d').drawImage(img,0,0,w,h);
+      cb(cv.toDataURL('image/jpeg',0.7));
+    };
+    img.src=dataUrl;
+  }
+  // 讀 EXIF GPS（輕量解析，依賴 exif 位置；若無則不填）
+  function readExifLocation(file, cb){
+    const fr=new FileReader();
+    fr.onload=()=>{
+      try{
+        const view=new DataView(fr.result);
+        if(view.getUint16(0)!==0xFFD8){ cb(null); return; }
+        let off=2, len=fr.result.byteLength;
+        while(off<len){
+          if(view.getUint16(off)===0xFFE1){
+            const exifStart=off+4, tiffOff=exifStart;
+            if(view.getUint16(tiffOff)==0x4949){ var little=true; } else { var little=false; }
+            const get16=(o)=>view.getUint16(o, little);
+            const get32=(o)=>view.getUint32(o, little);
+            const ifd0=get32(tiffOff+4)+tiffOff;
+            const tags=get16(ifd0);
+            let gpsOff=0;
+            for(let i=0;i<tags;i++){
+              const tag=get16(ifd0+2+i*12);
+              if(tag===0x8825){ gpsOff=get32(ifd0+2+i*12+8)+tiffOff; break; }
+            }
+            if(!gpsOff){ cb(null); return; }
+            const gtags=get16(gpsOff);
+            let latR,latD,latM,latS,lonR,lonD,lonM,lonS;
+            const rd=(o)=>get32(o)+(get32(o+4)/get32(o+8));
+            for(let i=0;i<gtags;i++){
+              const p=gpsOff+2+i*12, t=get16(p);
+              if(t===1) latR=get16(p+8);
+              if(t===2) latD=rd(p+8),latM=rd(p+8+8),latS=rd(p+8+16);
+              if(t===3) lonR=get16(p+8);
+              if(t===4) lonD=rd(p+8),lonM=rd(p+8+8),lonS=rd(p+8+16);
+            }
+            if(latD==null||lonD==null){ cb(null); return; }
+            let lat=latD+latM/60+latS/3600; if(latR===83) lat=-lat;
+            let lon=lonD+lonM/60+lonS/3600; if(lonR===87) lon=-lon;
+            reverseGeocode(lat,lon,cb);
+            return;
+          }
+          off+=2+view.getUint16(off+2);
+        }
+        cb(null);
+      }catch(e){ cb(null); }
+    };
+    fr.readAsArrayBuffer(file.slice(0,131072)); // 只讀前段 EXIF
+  }
+  // 經緯度轉城市名（用免費 Nominatim，需聯網；失敗則只給座標）
+  function reverseGeocode(lat,lon,cb){
+    const url=`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=10&accept-language=zh-TW`;
+    fetch(url,{headers:{'Accept':'application/json'}}).then(r=>r.json()).then(d=>{
+      const a=d.address||{};
+      const country=a.country||a.state||'';
+      const city=a.city||a.town||a.village||a.county||'';
+      cb({country,city,lat,lon});
+    }).catch(()=>cb({country:'',city:'',lat,lon}));
+  }
+
+  /* ====================================================
+     4. 讀書記錄（小說 + 心得）
+  ==================================================== */
+  registerModule('books',{
+    name:'讀書記錄', icon:'📖', desc:'記錄你看完的小說與心得',
+    badge:()=> WB.DB.books.length? `${WB.DB.books.length}`:'0',
+    render(root){
+      const books=WB.DB.books.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+      let html=`<div class="card" style="background:linear-gradient(135deg,rgba(255,126,182,.12),rgba(124,140,255,.08))">
+        <h3>📚 我的書單</h3>
+        <p class="hint">記下看完的小說，寫一句當下的感想。已讀 ${books.length} 本。</p>
+        <button class="btn sm" onclick="WB._addBook()">＋ 新增一本書</button>
+      </div>`;
+      if(books.length){
+        html+=books.map(b=>`<div class="book" data-id="${b.id}">
+          <h4>${esc(b.title||'未命名')}</h4>
+          <div class="by">${esc(b.author||'作者不詳')} · ${fmtDate(b.date)}</div>
+          <div class="note">${esc(b.note||'（尚無心得）')}</div>
+          <div class="ops">
+            <button class="btn ghost sm" onclick="WB._editBook('${b.id}')">編輯</button>
+            <button class="btn ghost sm" onclick="WB._delBook('${b.id}')">刪除</button>
+          </div>
+        </div>`).join('');
+      }else{
+        html+=`<div class="empty">還沒記錄任何書，點上方「＋ 新增一本書」開始 📖</div>`;
+      }
+      root.innerHTML=html;
+    }
+  });
+
+  WB._addBook=function(){ bookModal(null); };
+  WB._editBook=function(id){ bookModal(id); };
+  WB._delBook=function(id){
+    WB.DB.books=WB.DB.books.filter(x=>x.id!==id); WB.save(); WB.go('books'); WB.toast('已刪除');
+  };
+  function bookModal(id){
+    const editing=id?WB.DB.books.find(x=>x.id===id):null;
+    const root=$('#modalRoot');
+    root.innerHTML=`<div class="modal-mask" onclick="if(event.target===this)WB._closeModal()">
+      <div class="modal">
+        <button class="close" onclick="WB._closeModal()">✕</button>
+        <h3>${editing?'編輯書籍':'新增書籍 📖'}</h3>
+        <label class="fld">書名</label>
+        <input type="text" id="bTitle" placeholder="例：82年生的金智英" value="${editing?esc(editing.title):''}"/>
+        <label class="fld">作者</label>
+        <input type="text" id="bAuthor" placeholder="例：趙南柱" value="${editing?esc(editing.author):''}"/>
+        <label class="fld">完成日期</label>
+        <input type="date" id="bDate" value="${editing?esc(editing.date||''):new Date().toISOString().slice(0,10)}" style="background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:11px 12px;font-size:14px;width:100%"/>
+        <label class="fld">心得感想</label>
+        <textarea id="bNote" placeholder="最喜歡的角色、一句戳中你的話、讀後心情…">${editing?esc(editing.note):''}</textarea>
+        <div class="row" style="margin-top:16px;justify-content:flex-end">
+          <button class="btn" onclick="WB._saveBook('${id||''}')">${editing?'儲存':'加入書單'}</button>
+        </div>
+      </div></div>`;
+  }
+  WB._saveBook=function(id){
+    const title=$('#bTitle').value.trim();
+    const author=$('#bAuthor').value.trim();
+    const date=$('#bDate').value;
+    const note=$('#bNote').value.trim();
+    if(!title){ WB.toast('請填寫書名'); return; }
+    if(id){
+      Object.assign(WB.DB.books.find(x=>x.id===id),{title,author,date,note});
+    }else{
+      WB.DB.books.push({id:WB.uid(),title,author,date,note});
+    }
+    WB.save(); WB._closeModal(); WB.go('books'); WB.toast('✅ 已儲存');
+  };
+
+  WB._closeModal=function(){ $('#modalRoot').innerHTML=''; };
+
+};
+
+</script>
+</body>
+</html>
