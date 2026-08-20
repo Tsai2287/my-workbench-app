@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-title" content="我的工作台" />
-<meta name="theme-color" content="#FFE9EF" />
+<meta name="theme-color" content="#FF6B7E" />
 <title>我的工作台</title>
 <script>
 window.KITTY_IMGS = {
@@ -17,7 +17,11 @@ window.KITTY_IMGS = {
 };
 </script>
 
-<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon-180.png?v=2" />
+<link rel="apple-touch-icon" sizes="167x167" href="apple-touch-icon-167.png?v=2" />
+<link rel="apple-touch-icon" sizes="152x152" href="apple-touch-icon-152.png?v=2" />
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=2" />
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=2" />
 
 
 <style>
@@ -310,6 +314,60 @@ window.KITTY_IMGS = {
     .content{padding:4px 14px calc(40px + var(--safe-bot));}
     .topbar{padding:calc(12px + var(--safe-top)) 14px 6px;}
   }
+
+  /* ===== 行李项目操作按钮 ===== */
+  .check{position:relative;}
+  .item-act{
+    flex-shrink:0;width:30px;height:30px;border-radius:8px;border:none;background:transparent;
+    color:var(--muted);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+    margin-left:4px;transition:.15s;
+  }
+  .item-act:hover{background:var(--pink-soft);color:var(--pink-deep);}
+  .check.custom{background:rgba(255,205,55,.06);border-radius:10px;margin:4px -4px;padding-left:8px;}
+  .item-ops{display:flex;gap:2px;}
+  .add-item{
+    width:100%;margin-top:10px;padding:10px;border:1.5px dashed var(--line);
+    background:transparent;color:var(--txt2);border-radius:12px;cursor:pointer;
+    font-size:13px;transition:.15s;font-family:inherit;
+  }
+  .add-item:hover{border-color:var(--pink-deep);color:var(--pink-deep);background:var(--pink-soft);}
+  .add-item:active{transform:scale(.98);}
+
+  /* ===== 城市迷雾 列表/网格 视图 ===== */
+  .view-toggle{
+    display:flex;background:var(--pink-soft);border-radius:12px;padding:3px;gap:2px;width:fit-content;
+  }
+  .view-toggle button{
+    border:none;background:none;padding:7px 14px;border-radius:10px;font-size:13px;
+    color:var(--txt2);cursor:pointer;transition:.15s;font-family:inherit;
+  }
+  .view-toggle button.on{background:#fff;color:var(--pink-deep);font-weight:600;box-shadow:0 1px 4px rgba(230,30,55,.1);}
+  .country-block{margin-bottom:16px;}
+  .country-head{
+    font-size:13px;font-weight:600;color:var(--txt2);padding:8px 4px 6px;
+    border-bottom:1px solid var(--line2);margin-bottom:8px;
+    display:flex;align-items:center;gap:8px;
+  }
+  .country-head .ct{
+    background:var(--pink-soft);color:var(--pink-deep);font-size:11px;padding:1px 8px;border-radius:10px;
+  }
+  .city-row{
+    display:flex;gap:12px;padding:10px;border-radius:12px;background:#fff;
+    border:1px solid var(--line2);margin-bottom:8px;align-items:center;cursor:pointer;
+    transition:.15s;
+  }
+  .city-row:active{transform:scale(.98);}
+  .city-thumb{
+    width:60px;height:60px;border-radius:10px;flex-shrink:0;background:var(--pink-soft);
+    background-size:cover;background-position:center;overflow:hidden;
+    display:flex;align-items:center;justify-content:center;color:var(--pink-deep);font-size:24px;
+  }
+  .city-info{flex:1;min-width:0;}
+  .city-info .nm{font-size:15px;font-weight:600;color:var(--txt);margin-bottom:2px;}
+  .city-info .co{font-size:12px;color:var(--muted);}
+  .city-info .nt{font-size:12px;color:var(--txt2);margin-top:3px;line-height:1.4;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .city-row .ar{color:var(--muted);font-size:18px;}
 </style>
 </head>
 <body>
@@ -368,7 +426,10 @@ const defaultData = {
   luggage: {},         // 行李：{ [itemId]: true }
   luggageDays: 5,      // 行程天数
   luggageDest: 'kr',   // kr / jp / both
+  luggageCustom: [],   // 行李自定义项：[{id, group, title, note, order}]
+  luggageHidden: [],   // 默认行李项中被隐藏的 id（可恢复）
   cities: [],          // 城市迷雾：[{id,country,city,photo(dataURL),date,note,unlocked}]
+  citiesView: 'list',  // 城市视图：'list' | 'grid'
   books: [],           // 读书：[{id,title,author,note,date,cat}]
   // === 用户设置（新增）===
   theme: 'cream',      // 当前主题：cream/strawberry/mint/lavender/butter
@@ -718,10 +779,26 @@ window.initModules = function(){
 
   const destName={kr:'🇰🇷 韓國',jp:'🇯🇵 日本',both:'🇰🇷🇯🇵 韓國+日本'};
 
+  function luggageAllItems(){
+    // 返回 [{id, title, note, tags, group, isCustom}]
+    const hidden = new Set(WB.DB.luggageHidden||[]);
+    const customs = WB.DB.luggageCustom||[];
+    const out = [];
+    luggageBase.forEach(g=>{
+      g.items.forEach(it=>{
+        if(hidden.has(it.id)) return;
+        out.push({id:it.id, title:it.title, note:it.note, tags:it.tags, group:g.grp, isCustom:false});
+      });
+    });
+    customs.forEach(it=>{
+      out.push({id:it.id, title:it.title, note:it.note||'', group:it.group, isCustom:true});
+    });
+    return out;
+  }
   function luggageProgress(){
-    const all=[]; luggageBase.forEach(g=>g.items.forEach(i=>all.push(i.id)));
-    const d=all.filter(id=>WB.DB.luggage[id]).length;
-    return d?`${d}/${all.length}`:'0';
+    const all = luggageAllItems();
+    const d = all.filter(it=>WB.DB.luggage[it.id]).length;
+    return all.length? `${d}/${all.length}` : '0';
   }
 
   registerModule('luggage',{
@@ -741,19 +818,89 @@ window.initModules = function(){
       </div>`;
       root.insertAdjacentHTML('beforeend', destNote[WB.DB.luggageDest]||'');
 
+      // 恢復被隱藏項目提示
+      const hidden = WB.DB.luggageHidden||[];
+      if(hidden.length){
+        root.insertAdjacentHTML('beforeend',`<div class="card" style="border-color:var(--line);background:var(--pink-soft)">
+          <p class="hint" style="margin:0">已隱藏 ${hidden.length} 個預設項目
+          <button class="btn ghost sm" style="margin-left:8px" onclick="WB._restoreAllLuggage()">全部恢復</button></p>
+        </div>`);
+      }
+
       // 衣物數量建議
       const d=WB.DB.luggageDays;
       const clothNote=`建議 ${d} 天 → 上衣約 ${Math.ceil(d*0.8)} 件、內衣褲 ${d+1} 套`;
       const store=WB.DB.luggage;
+      const hiddenSet = new Set(hidden);
+      const customs = WB.DB.luggageCustom||[];
+
       luggageBase.forEach(g=>{
-        const wrap=document.createElement('div');
-        let items=g.items;
-        if(g.grp.includes('衣物')){
-          items=g.items.map(it=> it.id==='l_cloth'? {...it, note:clothNote}: it);
-        }
-        wrap._grp=g.grp;
-        root.appendChild(wrap);
-        renderCheckList(wrap, items, store, g.grp);
+        const card=document.createElement('div');
+        card.className='card';
+        const kittyStamp = (window.KITTY_IMGS? `<img src="${window.KITTY_IMGS.face}" alt=""/>` : window.KITTY({size:24}));
+        let html=`<div class="kitty-stamp">${kittyStamp}</div>
+          <h3>${g.grp}</h3>`;
+        // 默认项
+        let visibleCount = 0, doneCount = 0;
+        g.items.forEach(it=>{
+          if(hiddenSet.has(it.id)) return;
+          visibleCount++;
+          if(store[it.id]) doneCount++;
+          const checked=store[it.id]?'checked':'';
+          const tags=(it.tags||[]).map(t=>`<span class="tag ${t.c}">${t.t}</span>`).join('');
+          let noteHtml = it.note || '';
+          if(g.grp.includes('衣物') && it.id==='l_cloth') noteHtml = clothNote;
+          html+=`<label class="check ${store[it.id]?'done':''}" data-id="${it.id}">
+            <input type="checkbox" ${checked}/>
+            <div class="ct"><div class="t">${esc(it.title)}</div>
+            ${noteHtml?`<div class="n">${esc(noteHtml)}</div>`:''}
+            ${tags?`<div>${tags}</div>`:''}</div>
+            <button class="item-act" onclick="event.preventDefault();WB._hideLuggage('${it.id}')" title="隱藏">✕</button>
+          </label>`;
+        });
+        // 自定义项
+        customs.filter(it=>it.group===g.grp).forEach(it=>{
+          visibleCount++;
+          if(store[it.id]) doneCount++;
+          const checked=store[it.id]?'checked':'';
+          html+=`<label class="check custom ${store[it.id]?'done':''}" data-id="${it.id}">
+            <input type="checkbox" ${checked}/>
+            <div class="ct"><div class="t">${esc(it.title)}</div>
+            ${it.note?`<div class="n">${esc(it.note)}</div>`:''}
+            <span class="tag tip">自訂</span></div>
+            <div class="item-ops">
+              <button class="item-act" onclick="event.preventDefault();WB._editLuggage('${it.id}')" title="編輯">✏️</button>
+              <button class="item-act" onclick="event.preventDefault();WB._delLuggage('${it.id}')" title="刪除">🗑</button>
+            </div>
+          </label>`;
+        });
+
+        const pct = visibleCount? Math.round(doneCount/visibleCount*100):0;
+        html+=`<div class="progress-wrap" style="margin-top:8px">
+          <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+          <div class="progress-label"><span>${doneCount}/${visibleCount} 完成</span><span>${pct}%</span></div>
+        </div>
+        <button class="add-item" onclick="WB._addLuggage('${g.grp}')">＋ 新增項目到「${g.grp.replace(/^.\s/,'')}」</button>`;
+        card.innerHTML = html;
+        root.appendChild(card);
+
+        // 勾選交互（默认项 + 自定义项）
+        card.querySelectorAll('.check input[type=checkbox]').forEach(inp=>{
+          inp.onchange=(e)=>{
+            const lab = e.target.closest('.check');
+            const id = lab.dataset.id;
+            store[id] = e.target.checked;
+            WB.save();
+            lab.classList.toggle('done', e.target.checked);
+            // 更新进度条
+            const checks = card.querySelectorAll('.check');
+            const d2 = Array.from(checks).filter(x=>x.classList.contains('done')).length;
+            const p2 = Math.round(d2/checks.length*100);
+            card.querySelector('.progress-fill').style.width=p2+'%';
+            card.querySelector('.progress-label').innerHTML=`<span>${d2}/${checks.length} 完成</span><span>${p2}%</span>`;
+            WB.refreshBadges();
+          };
+        });
       });
 
       // 交互
@@ -767,6 +914,72 @@ window.initModules = function(){
     }
   });
 
+  /* ---------- 行李自定义项目 API ---------- */
+  WB._addLuggage = function(group){
+    WB._luggageEditing = null;
+    WB._luggageGroup = group;
+    openLuggageModal();
+  };
+  WB._editLuggage = function(id){
+    const it = (WB.DB.luggageCustom||[]).find(x=>x.id===id);
+    if(!it) return;
+    WB._luggageEditing = it;
+    WB._luggageGroup = it.group;
+    openLuggageModal();
+  };
+  WB._delLuggage = function(id){
+    if(!confirm('確定刪除這個自訂項目？')) return;
+    WB.DB.luggageCustom = (WB.DB.luggageCustom||[]).filter(x=>x.id!==id);
+    delete WB.DB.luggage[id];
+    WB.save(); WB.go('luggage'); WB.toast('已刪除 🗑');
+  };
+  WB._hideLuggage = function(id){
+    if(!WB.DB.luggageHidden) WB.DB.luggageHidden = [];
+    if(WB.DB.luggageHidden.indexOf(id)<0) WB.DB.luggageHidden.push(id);
+    WB.save(); WB.go('luggage'); WB.toast('已隱藏，可從頂部「全部恢復」');
+  };
+  WB._restoreAllLuggage = function(){
+    WB.DB.luggageHidden = [];
+    WB.save(); WB.go('luggage'); WB.toast('已全部恢復');
+  };
+  WB._saveLuggage = function(){
+    const title = $('#mLTitle').value.trim();
+    const note = $('#mLNote').value.trim();
+    if(!title){ WB.toast('請填寫項目名稱'); return; }
+    if(WB._luggageEditing){
+      Object.assign(WB._luggageEditing, {title, note});
+    } else {
+      WB.DB.luggageCustom = WB.DB.luggageCustom||[];
+      WB.DB.luggageCustom.push({
+        id:'lc_'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
+        group: WB._luggageGroup,
+        title, note
+      });
+    }
+    WB._luggageEditing = null;
+    WB.save(); WB._closeModal(); WB.go('luggage');
+    WB.toast(WB._luggageEditing===null?'已新增 ✅':'已更新 ✅');
+  };
+
+  function openLuggageModal(){
+    const e = WB._luggageEditing;
+    const group = WB._luggageGroup;
+    const root = $('#modalRoot');
+    root.innerHTML=`<div class="modal-mask" onclick="if(event.target===this)WB._closeModal()">
+      <div class="modal">
+        <button class="close" onclick="WB._closeModal()">✕</button>
+        <h3>${e?'編輯自訂項目':'新增到「'+group+'」'}</h3>
+        <label class="fld">項目名稱</label>
+        <input type="text" id="mLTitle" placeholder="例：過夜小包 / 紀念品購物袋" value="${e?esc(e.title):''}"/>
+        <label class="fld">備註（選填）</label>
+        <textarea id="mLNote" placeholder="例：放背包容易拿到">${e?esc(e.note||''):''}</textarea>
+        <div class="row" style="margin-top:16px;justify-content:flex-end">
+          <button class="btn" onclick="WB._saveLuggage()">${e?'儲存':'新增'}</button>
+        </div>
+      </div></div>`;
+    setTimeout(()=>$('#mLTitle').focus(), 100);
+  }
+
   /* ====================================================
      3. 城市迷霧地圖（記錄去過的地方 + 照片，解鎖式）
   ==================================================== */
@@ -775,27 +988,108 @@ window.initModules = function(){
     badge:()=> WB.DB.cities.filter(c=>c.unlocked).length? `${WB.DB.cities.filter(c=>c.unlocked).length}`:'0',
     render(root){
       const cities=WB.DB.cities;
+      const unlocked = cities.filter(c=>c.unlocked);
+      const view = WB.DB.citiesView || 'list';
       let html=`<div class="card" style="background:linear-gradient(135deg,rgba(90,209,201,.12),rgba(124,140,255,.08))">
         <h3>🌏 我的足跡</h3>
-        <p class="hint">點擊已解鎖的格子看照片與筆記；點「＋」新增一處旅程。
-        上傳手機相簿照片時會自動讀取定位（若照片帶 GPS）。</p>
+        <p class="hint">點擊格子看照片與筆記；點「＋」新增一處旅程。從手機相簿選照片會自動讀取定位。</p>
         <div class="progress-label" style="margin-top:4px">
-          <span>已解鎖 ${cities.filter(c=>c.unlocked).length} / ${cities.length} 處</span>
-          <span>${cities.length? Math.round(cities.filter(c=>c.unlocked).length/cities.length*100):0}%</span>
+          <span>已解鎖 <b style="color:var(--pink-deep)">${unlocked.length}</b> / ${cities.length} 處 · ${cities.length?Math.round(unlocked.length/cities.length*100):0}%</span>
+        </div>
+        <div class="row" style="margin-top:10px;justify-content:space-between;align-items:center">
+          <div class="view-toggle" id="viewToggle">
+            <button data-v="list" class="${view==='list'?'on':''}">🗒️ 列表</button>
+            <button data-v="grid" class="${view==='grid'?'on':''}">▦ 迷霧</button>
+          </div>
+          <button class="btn sm" onclick="WB._addCity()">＋ 新增足跡</button>
         </div>
       </div>`;
-      html+=`<div class="fog-grid">`;
-      cities.forEach(c=>{
-        html+=`<div class="fog-cell ${c.unlocked?'unlocked':''}" data-id="${c.id}" onclick="WB._openCity('${c.id}')">
-          ${c.photo?`<img src="${c.photo}" alt=""/>`:''}
-          <div class="fog">🌫️<span>${c.unlocked?'':'未解鎖'}</span></div>
-          <div class="meta"><b>${esc(c.city||'？')}</b><span>${esc(c.country||'')}</span></div>
+
+      if(!cities.length){
+        html+=`<div class="card empty" style="padding:36px 16px">
+          <div style="font-size:48px;margin-bottom:10px">🌏</div>
+          <div style="font-size:15px;color:var(--txt);margin-bottom:6px">還沒有任何足跡</div>
+          <div style="font-size:13px;color:var(--txt2);margin-bottom:16px">從新增第一處旅程開始，慢慢解鎖你的世界地圖</div>
+          <button class="btn" onclick="WB._addCity()">✈️ 新增第一處</button>
         </div>`;
+        root.innerHTML = html;
+        // 綁定切換
+        $$('#viewToggle button',root).forEach(b=>b.onclick=()=>{
+          WB.DB.citiesView = b.dataset.v; WB.save(); WB.go('cities');
+        });
+        return;
+      }
+
+      if(view === 'list'){
+        // 按國家分組
+        const byCountry = {};
+        unlocked.forEach(c=>{
+          const k = c.country || '未分類';
+          (byCountry[k] = byCountry[k] || []).push(c);
+        });
+        // 排序：按解鎖時間倒序（用 id 含時間戳）
+        Object.keys(byCountry).forEach(k=>byCountry[k].sort((a,b)=> (b.id>a.id?1:-1)));
+        // 國家順序按最近記錄時間
+        const countryOrder = Object.keys(byCountry).sort((a,b)=>{
+          const la = byCountry[a][0].id, lb = byCountry[b][0].id;
+          return lb.localeCompare(la);
+        });
+
+        countryOrder.forEach(co=>{
+          html+=`<div class="country-block"><div class="country-head">
+            <span>🌏 ${esc(co)}</span>
+            <span class="ct">${byCountry[co].length} 處</span>
+          </div>`;
+          byCountry[co].forEach(c=>{
+            const thumbStyle = c.photo? `background-image:url('${c.photo}')` : '';
+            const thumbInner = c.photo? '' : '✈️';
+            const dateStr = c.date ? new Date(c.date).toLocaleDateString('zh-Hant',{year:'numeric',month:'short',day:'numeric'}) : '';
+            html+=`<div class="city-row" data-id="${c.id}" onclick="WB._openCity('${c.id}')">
+              <div class="city-thumb" style="${thumbStyle}">${thumbInner}</div>
+              <div class="city-info">
+                <div class="nm">${esc(c.city||'未命名')}</div>
+                <div class="co">${esc(co)}${dateStr?' · '+dateStr:''}</div>
+                ${c.note?`<div class="nt">${esc(c.note)}</div>`:''}
+              </div>
+              <div class="ar">›</div>
+            </div>`;
+          });
+          html+=`</div>`;
+        });
+
+        // 若有未解鎖的（理論上不會，因為没有「未解鎖」的城市，但保险）
+        const locked = cities.filter(c=>!c.unlocked);
+        if(locked.length){
+          html+=`<div class="country-block"><div class="country-head"><span>🔒 未解鎖</span><span class="ct">${locked.length} 處</span></div>`;
+          locked.forEach(c=>{
+            html+=`<div class="city-row" data-id="${c.id}" onclick="WB._openCity('${c.id}')">
+              <div class="city-thumb">🔒</div>
+              <div class="city-info">
+                <div class="nm">${esc(c.city||'未命名')}</div>
+                <div class="co">${esc(c.country||'未分類')}</div>
+              </div>
+              <div class="ar">›</div>
+            </div>`;
+          });
+          html+=`</div>`;
+        }
+      } else {
+        // 網格視圖（保留原迷霧風格）
+        html+=`<div class="fog-grid">`;
+        cities.forEach(c=>{
+          html+=`<div class="fog-cell ${c.unlocked?'unlocked':''}" data-id="${c.id}" onclick="WB._openCity('${c.id}')">
+            ${c.photo?`<img src="${c.photo}" alt=""/>`:''}
+            <div class="fog">🌫️<span>${c.unlocked?'':'未解鎖'}</span></div>
+            <div class="meta"><b>${esc(c.city||'？')}</b><span>${esc(c.country||'')}</span></div>
+          </div>`;
+        });
+        html+=`<div class="fog-cell add-cell" onclick="WB._addCity()">＋</div>`;
+        html+=`</div>`;
+      }
+      root.innerHTML = html;
+      $$('#viewToggle button').forEach(b=>b.onclick=()=>{
+        WB.DB.citiesView = b.dataset.v; WB.save(); WB.go('cities');
       });
-      html+=`<div class="fog-cell add-cell" onclick="WB._addCity()">＋</div>`;
-      html+=`</div>`;
-      if(!cities.length) html+=`<div class="empty">還沒有足跡，點「＋」解鎖第一座城市吧 ✈️</div>`;
-      root.innerHTML=html;
     }
   });
 
