@@ -1,0 +1,15 @@
+{
+  "name": "我的工作台",
+  "short_name": "工作台",
+  "description": "韩文学习 · 行李检查 · 城市迷雾 · 读书记录",
+  "start_url": "index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFE9EF",
+  "theme_color": "#FFB6C8",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
