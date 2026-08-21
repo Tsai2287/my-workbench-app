@@ -212,6 +212,10 @@ window.KITTY_IMGS = {
     white-space:nowrap;
   }
   .seg button.on{background:var(--pink);color:#fff;font-weight:600;}
+  .seg-sm{background:var(--pink-soft);border-radius:11px;padding:3px;gap:3px;flex-wrap:nowrap;}
+  .seg-sm button{flex:1;min-width:48px;padding:7px 8px;font-size:13px;}
+  .deco-size-row{display:flex;align-items:center;gap:12px;margin-top:14px;}
+  .deco-size-label{font-size:13px;color:var(--txt2);font-weight:500;white-space:nowrap;}
 
   /* 表单 */
   input[type=text],input[type=date],textarea,select{
@@ -287,18 +291,37 @@ window.KITTY_IMGS = {
   .fld-half{flex:1;min-width:0;}
   .book-days{font-size:12px;color:var(--pink-deep);margin:6px 0 2px;font-weight:600;}
   .book-days.err{color:#d9534f;}
+  /* 裁切編輯器 */
+  .crop-stage{
+    position:relative;width:100%;background:#2b2430;border-radius:14px;overflow:hidden;
+    display:flex;align-items:center;justify-content:center;touch-action:none;
+  }
+  .crop-stage img{position:absolute;max-width:none;max-height:none;will-change:transform;cursor:grab;user-select:none;-webkit-user-drag:none;}
+  .crop-frame{
+    position:absolute;inset:0;pointer-events:none;border-radius:14px;
+    box-shadow:0 0 0 1px rgba(255,255,255,.5), inset 0 0 0 1px rgba(0,0,0,.25);
+  }
+  .crop-frame::after{
+    content:"";position:absolute;inset:0;background:rgba(43,36,48,.55);border-radius:14px;
+    -webkit-mask:linear-gradient(#000,#000) center/100% 100% no-repeat;
+    /* 中間透明、四週變暗：用徑向漸層近似 */
+    background:radial-gradient(circle at center, rgba(43,36,48,0) 38%, rgba(43,36,48,.6) 60%);
+  }
 
   /* ===== Kitty 吉祥物（主区右下角） ===== */
   .mascot{
     position:fixed;right:14px;bottom:calc(14px + var(--safe-bot));
-    width:100px;height:100px;z-index:30;
+    --deco-size:120px;width:var(--deco-size);height:var(--deco-size);z-index:30;
     filter:drop-shadow(0 3px 6px rgba(40,30,50,.12));
-    transition:transform .25s ease;
+    transition:transform .25s ease, width .2s ease, height .2s ease;
     pointer-events:none;display:flex;align-items:center;justify-content:center;
   }
+  .mascot.sz-small{--deco-size:84px;}
+  .mascot.sz-medium{--deco-size:120px;}
+  .mascot.sz-large{--deco-size:168px;}
   .mascot img{width:100%;height:100%;object-fit:contain;display:block;}
   @media (max-width:760px){
-    .mascot{right:10px;bottom:calc(10px + var(--safe-bot));width:88px;height:88px;}
+    .mascot{right:10px;bottom:calc(10px + var(--safe-bot));}
   }
 
   /* ===== 设置模块：主题卡 ===== */
@@ -551,6 +574,7 @@ const defaultData = {
   theme: 'cream',      // 当前主题：cream/strawberry/mint/lavender/butter
   customColor: '',     // 自定义强调色（hex）
   mascot: 'bike',      // 吉祥物选哪张：bike/bear/face/custom
+  decoSize: 'medium',  // 裝飾大小：small/medium/large
   customDecoImg: '',   // 自訂裝飾圖（dataURL），mascot='custom' 時使用
   bookCats: [{id:'want',name:'待看'},{id:'done',name:'已看完'},{id:'drop',name:'不看了'}],
   // === 侧栏顺序 + 改名（新增）===
@@ -744,6 +768,9 @@ function go(id){
     if(which==='custom') src = WB.DB.customDecoImg || '';
     else src = (window.KITTY_IMGS && window.KITTY_IMGS[which]) || '';
     mascot.innerHTML = src? `<img src="${src}" alt=""/>` : window.KITTY({size:66, act:m.kittyAct||'stand'});
+    const sz = WB.DB.decoSize||'medium';
+    mascot.classList.remove('sz-small','sz-medium','sz-large');
+    mascot.classList.add('sz-'+sz);
   }
 }
 function closeSidebar(){ $('#sidebar').classList.remove('open'); }
@@ -2042,6 +2069,14 @@ window.initModules = function(){
           <h3>🖼️ 主題裝飾</h3>
           <p class="hint">選擇一張 Kitty 圖案，或上傳你自己的圖片作為主區右下的裝飾。</p>
           <div class="mascot-grid">${mascotCards}</div>
+          <div class="deco-size-row">
+            <span class="deco-size-label">裝飾大小</span>
+            <div class="seg seg-sm" style="justify-content:flex-end">
+              <button data-sz="small" class="${WB.DB.decoSize==='small'?'on':''}">小</button>
+              <button data-sz="medium" class="${WB.DB.decoSize==='medium'?'on':''}">中</button>
+              <button data-sz="large" class="${WB.DB.decoSize==='large'?'on':''}">大</button>
+            </div>
+          </div>
           <div style="margin-top:14px;text-align:center;">
             <div style="background:var(--cream);border-radius:18px;padding:18px;display:inline-block;border:1px solid var(--line2)">
               ${customDecoActive
@@ -2099,19 +2134,22 @@ window.initModules = function(){
           WB.go('settings');
         };
       });
-      // 自訂圖片上傳
+      // 装饰大小切换
+      root.querySelectorAll('.deco-size-row .seg-sm button').forEach(b=>{
+        b.onclick=()=>{
+          WB.DB.decoSize=b.dataset.sz;
+          WB.save(); WB.go('settings');
+        };
+      });
+      // 自訂圖片上傳 → 開裁切編輯器
       const up=root.querySelector('#decoUpload');
       if(up){
         up.onchange=(e)=>{
           const file=e.target.files&&e.target.files[0];
           if(!file) return;
-          if(file.size>3*1024*1024){ WB.toast('圖片太大，請選 3MB 以內'); return; }
+          if(file.size>6*1024*1024){ WB.toast('圖片太大，請選 6MB 以內'); return; }
           const r=new FileReader();
-          r.onload=()=>{
-            WB.DB.customDecoImg=r.result;
-            WB.DB.mascot='custom';
-            WB.save(); WB.toast('已套用自訂裝飾 🖼️'); WB.go('settings');
-          };
+          r.onload=()=>{ openDecoCropper(r.result); };
           r.readAsDataURL(file);
         };
       }
@@ -2134,6 +2172,69 @@ window.initModules = function(){
     WB.DB.customDecoImg='';
     if(WB.DB.mascot==='custom') WB.DB.mascot='bike';
     WB.save(); WB.toast('已清除自訂裝飾'); WB.go('settings');
+  };
+  /* 自訂圖片裁切編輯器：正方形框內可拖移 + 縮放，確認後輸出裁切圖 */
+  function openDecoCropper(dataURL){
+    const root=$('#modalRoot');
+    root.innerHTML=`<div class="modal-mask" onclick="if(event.target===this)WB._closeModal()">
+      <div class="modal">
+        <button class="close" onclick="WB._closeModal()">✕</button>
+        <h3>✂️ 調整圖片</h3>
+        <p class="hint">拖動圖片調整位置，用滑桿或雙指縮放大小。</p>
+        <div class="crop-stage" id="cropStage">
+          <img id="cropImg" src="${dataURL}" draggable="false" alt=""/>
+          <div class="crop-frame"></div>
+        </div>
+        <input type="range" id="cropZoom" min="1" max="4" step="0.01" value="1" style="width:100%;margin:14px 0 4px"/>
+        <div style="font-size:11px;color:var(--txt2);text-align:center;">縮放 · 雙指捏合也可</div>
+        <div class="row" style="margin-top:16px;justify-content:flex-end;gap:8px">
+          <button class="btn ghost sm" onclick="WB._closeModal()">取消</button>
+          <button class="btn sm" onclick="WB._confirmCrop()">確認裁切 ✂️</button>
+        </div>
+      </div></div>`;
+    const stage=root.querySelector('#cropStage');
+    const img=root.querySelector('#cropImg');
+    const zoom=root.querySelector('#cropZoom');
+    const S=Math.min(300, stage.clientWidth||280);
+    stage.style.height=S+'px';
+    const st={x:0,y:0,scale:1};
+    function apply(){
+      img.style.transform=`translate(${st.x}px,${st.y}px) scale(${st.scale})`;
+    }
+    img.onload=()=>{ st.scale=1; st.x=0; st.y=0; zoom.value=1; apply(); };
+    zoom.oninput=()=>{ st.scale=parseFloat(zoom.value); apply(); };
+    // 拖移
+    let drag=false, lx=0, ly=0;
+    img.addEventListener('pointerdown',e=>{ drag=true; lx=e.clientX; ly=e.clientY; img.setPointerCapture(e.pointerId); });
+    img.addEventListener('pointermove',e=>{ if(!drag) return; st.x+=e.clientX-lx; st.y+=e.clientY-ly; lx=e.clientX; ly=e.clientY; apply(); });
+    img.addEventListener('pointerup',()=>{ drag=false; });
+    img.addEventListener('pointercancel',()=>{ drag=false; });
+    // 雙指縮放
+    let pinch=0;
+    stage.addEventListener('touchstart',e=>{ if(e.touches.length===2) pinch=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY); },{passive:true});
+    stage.addEventListener('touchmove',e=>{ if(e.touches.length===2&&pinch>0){ const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY); let s=st.scale*(d/pinch); s=Math.min(4,Math.max(1,s)); st.scale=s; zoom.value=s; pinch=d; apply(); } },{passive:true});
+    stage.addEventListener('touchend',()=>{ pinch=0; },{passive:true});
+    // 暫存原圖供確認時裁切
+    WB._cropSrc=dataURL; WB._cropState=st; WB._cropStageS=S;
+  }
+  WB._confirmCrop=function(){
+    const st=WB._cropState, S=WB._cropStageS;
+    const src=WB._cropSrc;
+    const im=new Image();
+    im.onload=()=>{
+      const cv=document.createElement('canvas'); cv.width=320; cv.height=320;
+      const ctx=cv.getContext('2d');
+      // 把 stage 視窗（S×S）映射到 320×320；圖在 stage 中以中心為原點，scale 放大
+      const dispW=im.naturalWidth*st.scale, dispH=im.naturalHeight*st.scale;
+      const sx = (S/2 - st.x) - dispW/2;   // 圖左上在原圖座標
+      const sy = (S/2 - st.y) - dispH/2;
+      const scaleTo320 = 320 / S;
+      ctx.drawImage(im, sx*scaleTo320, sy*scaleTo320, dispW*scaleTo320, dispH*scaleTo320);
+      const out=cv.toDataURL('image/png');
+      WB.DB.customDecoImg=out; WB.DB.mascot='custom';
+      WB.save(); WB._closeModal(); WB.toast('已套用自訂裝飾 🖼️'); WB.go('settings');
+    };
+    im.src=src;
   };
   WB._addCat=function(){
     const name=($('#newCatName').value||'').trim();
