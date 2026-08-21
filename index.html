@@ -550,7 +550,8 @@ const defaultData = {
   // === 用户设置（新增）===
   theme: 'cream',      // 当前主题：cream/strawberry/mint/lavender/butter
   customColor: '',     // 自定义强调色（hex）
-  mascot: 'bike',      // 吉祥物选哪张：bike/bear/face
+  mascot: 'bike',      // 吉祥物选哪张：bike/bear/face/custom
+  customDecoImg: '',   // 自訂裝飾圖（dataURL），mascot='custom' 時使用
   bookCats: [{id:'want',name:'待看'},{id:'done',name:'已看完'},{id:'drop',name:'不看了'}],
   // === 侧栏顺序 + 改名（新增）===
   navOrder: ['home','korean','luggage','cities','books','settings'],
@@ -735,11 +736,13 @@ function go(id){
   $('#content').innerHTML='';
   renderNav();
   m.render($('#content'));
-  // 吉祥物：默认用 bike 图，用户可在设置里换成 bear/face
+  // 吉祥物：默认用 bike 图，用户可在设置里换成 bear/face/自定义图
   const mascot=$('#mascot');
   if(mascot){
     const which = (WB.DB.mascot || 'bike');
-    const src = (window.KITTY_IMGS && window.KITTY_IMGS[which]) || '';
+    let src='';
+    if(which==='custom') src = WB.DB.customDecoImg || '';
+    else src = (window.KITTY_IMGS && window.KITTY_IMGS[which]) || '';
     mascot.innerHTML = src? `<img src="${src}" alt=""/>` : window.KITTY({size:66, act:m.kittyAct||'stand'});
   }
 }
@@ -2005,13 +2008,17 @@ window.initModules = function(){
       const mascots = [
         {key:'bike', label:'🚴 騎車', img:window.KITTY_IMGS&&window.KITTY_IMGS.bike},
         {key:'bear', label:'🧸 抱熊', img:window.KITTY_IMGS&&window.KITTY_IMGS.bear},
-        {key:'face', label:'😊 臉部', img:window.KITTY_IMGS&&window.KITTY_IMGS.face}
+        {key:'face', label:'😊 臉部', img:window.KITTY_IMGS&&window.KITTY_IMGS.face},
+        {key:'custom', label:'📷 自訂圖', img:null}
       ];
       const mascotCards = mascots.map(m=>`
         <div class="mascot-pick ${mascot===m.key?'on':''}" data-m="${m.key}">
-          <div class="mascot-prev">${m.img?`<img src="${m.img}" alt=""/>`:''}</div>
+          <div class="mascot-prev">${m.key==='custom'
+            ? (WB.DB.customDecoImg?`<img src="${WB.DB.customDecoImg}" alt=""/>`:'📷')
+            : (m.img?`<img src="${m.img}" alt=""/>`:'')}</div>
           <div class="mascot-label">${m.label}</div>
         </div>`).join('');
+      const customDecoActive = mascot==='custom' && !!WB.DB.customDecoImg;
       // 分类管理
       const catList = cats.map((c,i)=>`
         <div class="cat-row">
@@ -2033,14 +2040,23 @@ window.initModules = function(){
 
         <div class="card">
           <h3>🖼️ 主題裝飾</h3>
-          <p class="hint">選擇一張 Kitty 圖案作為主區右下的吉祥物。預設隨模組陪伴你。</p>
+          <p class="hint">選擇一張 Kitty 圖案，或上傳你自己的圖片作為主區右下的裝飾。</p>
           <div class="mascot-grid">${mascotCards}</div>
           <div style="margin-top:14px;text-align:center;">
-              <div style="background:var(--cream);border-radius:18px;padding:18px;display:inline-block;border:1px solid var(--line2)">
-                ${window.KITTY_IMGS&&window.KITTY_IMGS[mascot]?`<img src="${window.KITTY_IMGS[mascot]}" style="max-width:180px;max-height:200px;"/>`:''}
-              </div>
-              <div style="color:var(--muted);font-size:12px;margin-top:8px;">${mascots.find(x=>x.key===mascot)?.label} · 當前吉祥物</div>
+            <div style="background:var(--cream);border-radius:18px;padding:18px;display:inline-block;border:1px solid var(--line2)">
+              ${customDecoActive
+                ? `<img src="${WB.DB.customDecoImg}" style="max-width:180px;max-height:200px;object-fit:contain;border-radius:12px"/>`
+                : (window.KITTY_IMGS&&window.KITTY_IMGS[mascot]?`<img src="${window.KITTY_IMGS[mascot]}" style="max-width:180px;max-height:200px;"/>`:'')}
             </div>
+            <div style="color:var(--muted);font-size:12px;margin-top:8px;">${mascots.find(x=>x.key===mascot)?.label} · 當前裝飾</div>
+            ${mascot==='custom'?`
+              <div class="row" style="margin-top:10px;justify-content:center;gap:8px;">
+                <button class="btn sm" onclick="document.getElementById('decoUpload').click()">📤 更換圖片</button>
+                ${WB.DB.customDecoImg?`<button class="btn ghost sm" onclick="WB._clearDeco()">✕ 清除</button>`:''}
+              </div>
+              <input type="file" id="decoUpload" accept="image/*" style="display:none"/>
+            `:''}
+          </div>
         </div>
 
         <div class="card">
@@ -2074,12 +2090,31 @@ window.initModules = function(){
           WB.save(); WB.toast('已更換裝飾 ✨');
           // 立即刷新主区吉祥物
           const mEl=$('#mascot');
-          if(mEl&&window.KITTY_IMGS&&window.KITTY_IMGS[WB.DB.mascot]){
-            mEl.innerHTML=`<img src="${window.KITTY_IMGS[WB.DB.mascot]}" alt=""/>`;
+          if(mEl){
+            let src='';
+            if(WB.DB.mascot==='custom') src=WB.DB.customDecoImg||'';
+            else src=(window.KITTY_IMGS&&window.KITTY_IMGS[WB.DB.mascot])||'';
+            mEl.innerHTML = src? `<img src="${src}" alt=""/>` : window.KITTY({size:66, act:'stand'});
           }
           WB.go('settings');
         };
       });
+      // 自訂圖片上傳
+      const up=root.querySelector('#decoUpload');
+      if(up){
+        up.onchange=(e)=>{
+          const file=e.target.files&&e.target.files[0];
+          if(!file) return;
+          if(file.size>3*1024*1024){ WB.toast('圖片太大，請選 3MB 以內'); return; }
+          const r=new FileReader();
+          r.onload=()=>{
+            WB.DB.customDecoImg=r.result;
+            WB.DB.mascot='custom';
+            WB.save(); WB.toast('已套用自訂裝飾 🖼️'); WB.go('settings');
+          };
+          r.readAsDataURL(file);
+        };
+      }
       // 分类改名
       root.querySelectorAll('#catList input').forEach(inp=>{
         inp.onchange=(e)=>{
@@ -2094,6 +2129,11 @@ window.initModules = function(){
     const v=$('#customColor').value;
     WB.DB.customColor=v; WB.save(); WB.applyTheme(); WB.toast('已套用自訂色 🎨');
     WB.go('settings');
+  };
+  WB._clearDeco=function(){
+    WB.DB.customDecoImg='';
+    if(WB.DB.mascot==='custom') WB.DB.mascot='bike';
+    WB.save(); WB.toast('已清除自訂裝飾'); WB.go('settings');
   };
   WB._addCat=function(){
     const name=($('#newCatName').value||'').trim();
