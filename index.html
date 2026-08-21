@@ -554,15 +554,9 @@ function renderNav(){
     const el=document.createElement('div');
     el.className='nav-item'+(id===current? ' active':'');
     el.dataset.id=id;
-    const badge = m.badge? `<span class="badge">${m.badge()}</span>`:'';
     const kittyIco = window.KITTY_IMGS? `<img class="kimg" src="${window.KITTY_IMGS.face}" alt=""/>` : window.KITTY({size:26, act:m.kittyAct||'stand'});
-    el.innerHTML=`<span class="kico">${kittyIco}</span><span class="nav-label">${esc(getNavName(id, m))}</span><span class="nav-rename-btn" data-act="rename" title="改名">✏️</span>${badge}`;
-    el.onclick=(e)=>{
-      if(e.target.closest('[data-act="rename"]')) return; // 改名按钮单独处理
-      go(id); closeSidebar();
-    };
-    const renameBtn = el.querySelector('[data-act="rename"]');
-    renameBtn.onclick=(e)=>{ e.stopPropagation(); startRename(el, id); };
+    el.innerHTML=`<span class="kico">${kittyIco}</span><span class="nav-label">${esc(getNavName(id, m))}</span>`;
+    el.onclick=()=>{ go(id); closeSidebar(); };
     nav.appendChild(el);
   });
   setupNavDrag();
@@ -605,19 +599,32 @@ function setupNavDrag(){
   const nav = $('#nav');
   const items = $$('.nav-item', nav);
   items.forEach(el=>{
-    let pressTimer=null, startX=0, startY=0, dragging=false;
+    let pressTimer=null, startX=0, startY=0, dragging=false, longFired=false;
     const onDown=(e)=>{
       // 改名输入时不启动
       if(el.classList.contains('renaming')) return;
       const t = e.touches? e.touches[0] : e;
       startX=t.clientX; startY=t.clientY;
-      pressTimer=setTimeout(()=>{ dragging=true; el.classList.add('dragging'); try{navigator.vibrate&&navigator.vibrate(20);}catch(_){} }, 500);
+      dragging=false; longFired=false;
+      // 长按 500ms：先进入「待定」，之后分两路——移动则拖拽，松手则改名
+      pressTimer=setTimeout(()=>{
+        longFired=true;
+        if(!dragging){
+          // 还没移动 → 触发改名
+          startRename(el, el.dataset.id);
+        }
+      }, 500);
     };
     const onMove=(e)=>{
       if(!pressTimer && !dragging) return;
       const t = e.touches? e.touches[0] : e;
       const dx=t.clientX-startX, dy=t.clientY-startY;
-      if(!dragging && Math.hypot(dx,dy)>8){ clearTimeout(pressTimer); pressTimer=null; return; }
+      if(!dragging && Math.hypot(dx,dy)>8){
+        // 移动超过阈值 → 升级为拖拽
+        clearTimeout(pressTimer); pressTimer=null;
+        dragging=true; el.classList.add('dragging');
+        try{navigator.vibrate&&navigator.vibrate(20);}catch(_){}
+      }
       if(!dragging) return;
       e.preventDefault();
       // 找当前 hover 目标
@@ -639,7 +646,7 @@ function setupNavDrag(){
     };
     const onUp=()=>{
       clearTimeout(pressTimer); pressTimer=null;
-      if(!dragging) return;
+      if(!dragging){ return; } // 改名已在长按里处理，这里不做事
       dragging=false; el.classList.remove('dragging');
       const target=_navDrag._target, where=_navDrag._where;
       items.forEach(x=>x.classList.remove('nav-drop-before','nav-drop-after'));
@@ -664,13 +671,7 @@ function setupNavDrag(){
   _navDrag = _navDrag || {};
 }
 function refreshBadges(){
-  $$('.nav-item').forEach(el=>{
-    const m=modules[el.dataset.id];
-    if(!m || !m.badge) return;
-    const b=el.querySelector('.badge');
-    const v=m.badge();
-    if(b) b.textContent=v; else renderNav();
-  });
+  // 侧栏不再显示数字 badge，保留空函数以兼容模块调用
 }
 
 let current='home';
@@ -923,11 +924,10 @@ window.initModules = function(){
   }
   async function loadHomeWeather(){
     const box=document.getElementById('homeWeather');
-    const locEl=document.getElementById('homeLoc');
     if(!box) return;
     // 如果 30 分钟内拉过，不重复
     if(WB.DB.homeWeather && Date.now()-(WB.DB.homeWeather.fetchedAt||0)<30*60*1000){
-      paintWeather(WB.DB.homeWeather, locEl? (WB.DB.homeLoc && WB.DB.homeLoc.label) : '');
+      paintWeather(WB.DB.homeWeather, WB.DB.homeLoc && WB.DB.homeLoc.label);
       return;
     }
     box.innerHTML='<span class="loading-dots">天氣讀取中…</span>';
@@ -937,10 +937,19 @@ window.initModules = function(){
         const r=await fetch(url);
         const j=await r.json();
         if(!j.current) throw new Error('no current');
-        WB.DB.homeWeather = {temp:Math.round(j.current.temperature_2m), code:j.current.weather_code, city:label||'', fetchedAt:Date.now()};
-        WB.DB.homeLoc = {lat, lon, label:label||''};
+        // 没有给定地区名时，用反向地理编码推测（免费、免 key）
+        let area = label || '';
+        if(!area){
+          try{
+            const g=await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=zh`);
+            const gd=await g.json();
+            area = gd.city || gd.locality || gd.principalSubdivision || gd.countryName || '';
+          }catch(_){ area=''; }
+        }
+        WB.DB.homeWeather = {temp:Math.round(j.current.temperature_2m), code:j.current.weather_code, city:area, fetchedAt:Date.now()};
+        WB.DB.homeLoc = {lat, lon, label:area};
         WB.save();
-        paintWeather(WB.DB.homeWeather, label);
+        paintWeather(WB.DB.homeWeather, area);
       }catch(e){
         box.innerHTML='<span class="muted">天氣暫時讀不到 😅</span>';
       }
@@ -957,7 +966,6 @@ window.initModules = function(){
   }
   function paintWeather(w, label){
     const box=document.getElementById('homeWeather');
-    const locEl=document.getElementById('homeLoc');
     if(!box || !w) return;
     // WMO weather code → 图标 + 文字
     const map={
@@ -970,44 +978,10 @@ window.initModules = function(){
       95:['⛈️','雷雨'],96:['⛈️','雷雨'],99:['⛈️','雷雨']
     };
     const it=map[w.code]||['🌡️',''];
-    box.innerHTML=`<span class="wico">${it[0]}</span><span class="wtemp">${w.temp}°C</span><span class="wdesc">${it[1]}</span>`;
-    if(locEl){
-      locEl.textContent = (label||w.city) ? `📍 ${label||w.city}` : '📍 當前位置';
-    }
+    const area = (label || w.city || '');
+    // 氣溫 + 地區 同時顯示
+    box.innerHTML=`<span class="wico">${it[0]}</span><span class="wtemp">${w.temp}°C</span><span class="wdesc">${it[1]}${area?` · ${area}`:''}</span>`;
   }
-  function showHomeProgress(){
-    const box=document.getElementById('homeProgress');
-    if(!box) return;
-    // 韩文：已勾 / 总数
-    const koreanTotal = (typeof koreanStages!=='undefined')? koreanStages.reduce((a,s)=>a+s.items.length,0) : 0;
-    const koreanDone = Object.values(WB.DB.korean||{}).filter(Boolean).length;
-    // 行李：已勾
-    let luggageTotal=0, luggageDone=0;
-    if(typeof buildLuggage==='function'){
-      const list=buildLuggage();
-      luggageTotal=list.length;
-      luggageDone=list.filter(i=>WB.DB.luggage[i.id]).length;
-    }
-    // 城市：已点亮
-    const cities = (WB.DB.cities||[]).length;
-    // 读书：已看完
-    const booksDone = (WB.DB.books||[]).filter(b=>b.cat==='done').length;
-    const booksTotal = (WB.DB.books||[]).length;
-    const koreanPct = koreanTotal? Math.round(koreanDone/koreanTotal*100):0;
-    const luggagePct = luggageTotal? Math.round(luggageDone/luggageTotal*100):0;
-    const line=(icon,label,cur,tot,pct)=>`
-      <div class="hp-row">
-        <div class="hp-label">${icon} ${label}</div>
-        <div class="hp-bar"><div class="hp-fill" style="width:${pct}%"></div></div>
-        <div class="hp-val">${cur}/${tot} · ${pct}%</div>
-      </div>`;
-    box.innerHTML =
-      line('🇰🇷','韓文學習',koreanDone,koreanTotal,koreanPct) +
-      line('🧳','行李清單',luggageDone,luggageTotal,luggagePct) +
-      line('🗺️','城市迷霧',cities,cities,cities>0?100:0) +
-      line('📚','已看書',booksDone,booksTotal,booksTotal?Math.round(booksDone/booksTotal*100):0);
-  }
-
   registerModule('home',{
     name:'首頁', icon:'🏠', kittyAct:'stand', desc:'今天的小事 · 剛剛好的提醒',
     render(root){
@@ -1019,19 +993,13 @@ window.initModules = function(){
             <div id="homeDate" class="home-date">載入中…</div>
             <div id="homeQuote" class="home-quote"></div>
             <div class="home-loc-row">
-              <span id="homeLoc" class="home-loc">📍 定位中…</span>
-              <button class="home-refresh" id="homeRefreshBtn" type="button">↻ 重新整理</button>
+              <button class="home-refresh" id="homeRefreshBtn" type="button">↻ 重新整理天氣</button>
             </div>
           </div>
           <div class="home-right">
             <div class="home-weather" id="homeWeather"><span class="loading-dots">天氣讀取中…</span></div>
             <div class="home-kitty-wrap">${kitty}</div>
           </div>
-        </div>
-
-        <div class="card home-progress">
-          <h3>📊 你的進度</h3>
-          <div id="homeProgress">載入中…</div>
         </div>
 
         <div class="card home-shortcut">
@@ -1048,10 +1016,9 @@ window.initModules = function(){
       startHomeClock();
       showHomeQuote();
       loadHomeWeather();
-      showHomeProgress();
       // 重新整理
       const rb=document.getElementById('homeRefreshBtn');
-      if(rb) rb.onclick=()=>{ WB.DB.homeWeather=null; loadHomeWeather(); showHomeProgress(); };
+      if(rb) rb.onclick=()=>{ WB.DB.homeWeather=null; loadHomeWeather(); };
       // 快捷入口
       $$('.hs-tile', root).forEach(b=>{
         b.onclick=()=>{ go(b.dataset.go); closeSidebar(); };
