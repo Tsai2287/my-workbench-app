@@ -296,7 +296,7 @@ window.KITTY_IMGS = {
     position:relative;width:100%;background:#2b2430;border-radius:14px;overflow:hidden;
     display:flex;align-items:center;justify-content:center;touch-action:none;
   }
-  .crop-stage img{position:absolute;max-width:none;max-height:none;will-change:transform;cursor:grab;user-select:none;-webkit-user-drag:none;}
+  .crop-stage img{position:absolute;max-width:none;max-height:none;will-change:transform;cursor:grab;user-select:none;-webkit-user-drag:none;transform-origin:center center;}
   .crop-frame{
     position:absolute;inset:0;pointer-events:none;border-radius:14px;
     box-shadow:0 0 0 1px rgba(255,255,255,.5), inset 0 0 0 1px rgba(0,0,0,.25);
@@ -2185,7 +2185,7 @@ window.initModules = function(){
           <img id="cropImg" src="${dataURL}" draggable="false" alt=""/>
           <div class="crop-frame"></div>
         </div>
-        <input type="range" id="cropZoom" min="1" max="4" step="0.01" value="1" style="width:100%;margin:14px 0 4px"/>
+        <input type="range" id="cropZoom" min="0.3" max="4" step="0.01" value="1" style="width:100%;margin:14px 0 4px"/>
         <div style="font-size:11px;color:var(--txt2);text-align:center;">縮放 · 雙指捏合也可</div>
         <div class="row" style="margin-top:16px;justify-content:flex-end;gap:8px">
           <button class="btn ghost sm" onclick="WB._closeModal()">取消</button>
@@ -2197,11 +2197,19 @@ window.initModules = function(){
     const zoom=root.querySelector('#cropZoom');
     const S=Math.min(300, stage.clientWidth||280);
     stage.style.height=S+'px';
-    const st={x:0,y:0,scale:1};
+    // fit：讓整張圖「contain」進 stage（以中心為原點）
+    const st={x:0,y:0,scale:1,fit:1,natW:1,natH:1};
     function apply(){
+      // 基準尺寸 = 原圖 * fit，再用 scale 縮放；transform-origin 為中心
+      const bw=st.natW*st.fit, bh=st.natH*st.fit;
+      img.style.width=bw+'px'; img.style.height=bh+'px';
       img.style.transform=`translate(${st.x}px,${st.y}px) scale(${st.scale})`;
     }
-    img.onload=()=>{ st.scale=1; st.x=0; st.y=0; zoom.value=1; apply(); };
+    img.onload=()=>{
+      const nw=img.naturalWidth||1, nh=img.naturalHeight||1;
+      st.natW=nw; st.natH=nh; st.fit=Math.min(S/nw, S/nh); // contain
+      st.scale=1; st.x=0; st.y=0; zoom.value=1; apply();
+    };
     zoom.oninput=()=>{ st.scale=parseFloat(zoom.value); apply(); };
     // 拖移
     let drag=false, lx=0, ly=0;
@@ -2212,7 +2220,7 @@ window.initModules = function(){
     // 雙指縮放
     let pinch=0;
     stage.addEventListener('touchstart',e=>{ if(e.touches.length===2) pinch=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY); },{passive:true});
-    stage.addEventListener('touchmove',e=>{ if(e.touches.length===2&&pinch>0){ const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY); let s=st.scale*(d/pinch); s=Math.min(4,Math.max(1,s)); st.scale=s; zoom.value=s; pinch=d; apply(); } },{passive:true});
+    stage.addEventListener('touchmove',e=>{ if(e.touches.length===2&&pinch>0){ const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY); let s=st.scale*(d/pinch); s=Math.min(4,Math.max(0.3,s)); st.scale=s; zoom.value=s; pinch=d; apply(); } },{passive:true});
     stage.addEventListener('touchend',()=>{ pinch=0; },{passive:true});
     // 暫存原圖供確認時裁切
     WB._cropSrc=dataURL; WB._cropState=st; WB._cropStageS=S;
@@ -2224,12 +2232,18 @@ window.initModules = function(){
     im.onload=()=>{
       const cv=document.createElement('canvas'); cv.width=320; cv.height=320;
       const ctx=cv.getContext('2d');
-      // 把 stage 視窗（S×S）映射到 320×320；圖在 stage 中以中心為原點，scale 放大
-      const dispW=im.naturalWidth*st.scale, dispH=im.naturalHeight*st.scale;
-      const sx = (S/2 - st.x) - dispW/2;   // 圖左上在原圖座標
-      const sy = (S/2 - st.y) - dispH/2;
-      const scaleTo320 = 320 / S;
-      ctx.drawImage(im, sx*scaleTo320, sy*scaleTo320, dispW*scaleTo320, dispH*scaleTo320);
+      // 中心原點模型：圖中心在 stage 中心 + (st.x, st.y)，顯示尺寸 = nat * fit * scale
+      const dispW=st.natW*st.fit*st.scale, dispH=st.natH*st.fit*st.scale;
+      // 圖左上在 stage 座標
+      const tlX = S/2 + st.x - dispW/2;
+      const tlY = S/2 + st.y - dispH/2;
+      // stage 區域 [0,S] 對應到原圖座標（除以 fit*scale）
+      const k = st.fit*st.scale;
+      const sx = (0 - tlX)/k;          // 原圖左上 x
+      const sy = (0 - tlY)/k;          // 原圖左上 y
+      const sW = S/k;                  // 原圖裁切寬
+      const sH = S/k;                  // 原圖裁切高
+      ctx.drawImage(im, sx, sy, sW, sH, 0, 0, 320, 320);
       const out=cv.toDataURL('image/png');
       WB.DB.customDecoImg=out; WB.DB.mascot='custom';
       WB.save(); WB._closeModal(); WB.toast('已套用自訂裝飾 🖼️'); WB.go('settings');
