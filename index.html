@@ -244,7 +244,9 @@ window.KITTY_IMGS = {
   /* 读书 */
   .book{border:1px solid var(--line2);border-radius:16px;padding:14px;background:var(--cream);}
   .book h4{margin:0 0 4px;font-size:15px;color:var(--txt);font-weight:700;}
-  .book .by{color:var(--txt2);font-size:12px;margin-bottom:8px;}
+  .book .by{color:var(--txt2);font-size:12px;margin-bottom:4px;}
+  .book .period{color:var(--pink-deep);font-size:12px;margin-bottom:8px;font-weight:600;}
+  .book .period b{color:var(--pink-deep);}
   .book .note{font-size:13px;color:var(--txt);line-height:1.5;white-space:pre-wrap;}
   .book .ops{display:flex;gap:8px;margin-top:10px;}
 
@@ -278,6 +280,10 @@ window.KITTY_IMGS = {
   }
   .modal h3{margin:0 0 14px;color:var(--txt);font-weight:700;}
   .modal .close{float:right;font-size:22px;color:var(--muted);cursor:pointer;background:none;border:none;}
+  .fld-row{display:flex;gap:10px;}
+  .fld-half{flex:1;min-width:0;}
+  .book-days{font-size:12px;color:var(--pink-deep);margin:6px 0 2px;font-weight:600;}
+  .book-days.err{color:#d9534f;}
 
   /* ===== Kitty 吉祥物（主区右下角） ===== */
   .mascot{
@@ -393,10 +399,22 @@ window.KITTY_IMGS = {
   /* ===== 城市迷霧 · 世界地圖視圖 ===== */
   .map-card{padding:14px;}
   .world-map{
-    width:100%;border-radius:14px;overflow:hidden;background:#EAF2FB;
+    width:100%;border-radius:14px;overflow:hidden;background:#EAF2FB;position:relative;touch-action:none;
     border:1px solid var(--line);box-shadow:inset 0 2px 10px rgba(40,60,90,.05);
   }
-  .world-map svg{display:block;width:100%;height:auto;}
+  .world-map svg{display:block;width:100%;height:auto;touch-action:none;cursor:grab;}
+  .world-map.zoomed svg{cursor:grab;}
+  .map-zoombar{
+    position:absolute;top:10px;right:10px;display:flex;flex-direction:column;gap:6px;z-index:3;
+  }
+  .map-zoombar button{
+    width:34px;height:34px;border-radius:10px;border:1px solid var(--line);
+    background:rgba(255,255,255,.92);color:var(--pink-deep);font-size:18px;font-weight:700;
+    box-shadow:0 2px 6px rgba(40,40,60,.12);cursor:pointer;display:flex;align-items:center;justify-content:center;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .map-zoombar button:active{transform:scale(.92);background:#fff;}
+  .map-tip{font-size:11px;opacity:.7;font-weight:400;}
   .map-dot{cursor:pointer;transition:transform .15s ease;}
   .map-dot:hover{transform-origin:center;}
   .map-dot:hover .map-core{filter:drop-shadow(0 0 2px rgba(255,80,120,.9));}
@@ -1526,7 +1544,7 @@ window.initModules = function(){
     }
   });
 
-  /* 世界地圖視圖：內置 SVG + 城市發光點 */
+  /* 世界地圖視圖：內置 SVG + 城市發光點 + 縮放/拖移 */
   function renderCityMap(cities){
     const lit = cities.filter(c=>placeCoord(c.country, c.city));
     let dots='';
@@ -1543,23 +1561,104 @@ window.initModules = function(){
     const unlockedN = cities.filter(c=>c.unlocked).length;
     const empty = cities.length===0;
     return `<div class="card map-card">
-      <div class="world-map">
-        <svg viewBox="0 0 360 180" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
-          <rect x="0" y="0" width="360" height="180" fill="#EAF2FB"/>
-          <path d="${WORLD_MAP_PATH}" fill="#CFE0F2" stroke="#B8CFE8" stroke-width="0.3"/>
-          ${dots}
+      <div class="world-map" id="worldMap">
+        <div class="map-zoombar">
+          <button data-z="in" aria-label="放大">＋</button>
+          <button data-z="out" aria-label="縮小">－</button>
+          <button data-z="reset" aria-label="還原">⤢</button>
+        </div>
+        <svg viewBox="0 0 360 180" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" id="worldMapSvg">
+          <g id="mapZoom">
+            <rect x="0" y="0" width="360" height="180" fill="#EAF2FB"/>
+            <path d="${WORLD_MAP_PATH}" fill="#CFE0F2" stroke="#B8CFE8" stroke-width="0.3"/>
+            ${dots}
+          </g>
         </svg>
       </div>
       ${empty
         ? `<div class="map-empty"><div class="icon">🌏</div>還沒有任何足跡<br/><span style="font-size:12px;opacity:.75">從「＋ 新增足跡」開始，第一個點亮的城市就是你的冒險起點</span></div>`
-        : `<div class="map-legend">🌟 已點亮 <b>${lit.length}</b> / ${cities.length} 個地點${unlockedN>lit.length?` · 還有 <b>${unlockedN-lit.length}</b> 個待解鎖`:''}</div>`}
+        : `<div class="map-legend">🌟 已點亮 <b>${lit.length}</b> / ${cities.length} 個地點${unlockedN>lit.length?` · 還有 <b>${unlockedN-lit.length}</b> 個待解鎖`:''}<span class="map-tip"> · 雙擊/雙指縮放，拖動平移</span></div>`}
     </div>`;
+  }
+
+  /* 地圖縮放 / 平移 */
+  const mapView = { k:1, tx:0, ty:0 };
+  function applyMapView(svg){
+    const g = svg && svg.querySelector('#mapZoom');
+    if(g) g.setAttribute('transform', `translate(${mapView.tx.toFixed(2)},${mapView.ty.toFixed(2)}) scale(${mapView.k.toFixed(3)})`);
+  }
+  function clampMap(){
+    const k=mapView.k;
+    if(k<=1){ mapView.tx=0; mapView.ty=0; return; }
+    const maxX=360*(1-1/k), maxY=180*(1-1/k);
+    mapView.tx = Math.min(0, Math.max(-maxX, mapView.tx));
+    mapView.ty = Math.min(0, Math.max(-maxY, mapView.ty));
+  }
+  function zoomMap(svg, factor, cx, cy){
+    const old=mapView.k;
+    const k=Math.min(6, Math.max(1, old*factor));
+    if(k===old) return;
+    cx = (cx==null)?180:cx; cy=(cy==null)?90:cy;
+    mapView.k=k;
+    mapView.tx = cx - (cx - mapView.tx)*(k/old);
+    mapView.ty = cy - (cy - mapView.ty)*(k/old);
+    clampMap(); applyMapView(svg);
+  }
+  function svgPoint(svg, clientX, clientY){
+    const r=svg.getBoundingClientRect();
+    return { x:(clientX-r.left)/r.width*360, y:(clientY-r.top)/r.height*180 };
+  }
+  function touchDist(e){
+    const a=e.touches[0], b=e.touches[1];
+    return Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY);
   }
   function bindCityMap(root, cities){
     $$('.map-dot', root).forEach(g=>{
       g.style.cursor='pointer';
       g.onclick=()=>{ WB._openCity(g.dataset.id); };
     });
+    const wrap = root.querySelector('#worldMap');
+    const svg = root.querySelector('#worldMapSvg');
+    if(!wrap || !svg) return;
+    applyMapView(svg);
+    wrap.querySelectorAll('.map-zoombar button').forEach(b=>{
+      b.onclick=()=>{
+        if(b.dataset.z==='reset'){ mapView.k=1; mapView.tx=0; mapView.ty=0; clampMap(); applyMapView(svg); return; }
+        zoomMap(svg, b.dataset.z==='in'?1.6:1/1.6);
+      };
+    });
+    svg.addEventListener('dblclick', e=>{
+      const p=svgPoint(svg, e.clientX, e.clientY);
+      zoomMap(svg, mapView.k>=1.5?1/1.6:1.8, p.x, p.y);
+    });
+    let dragging=false, lastX=0, lastY=0, downX=0, downY=0;
+    svg.addEventListener('pointerdown', e=>{
+      if(mapView.k<=1) return;
+      dragging=true; lastX=e.clientX; lastY=e.clientY; downX=e.clientX; downY=e.clientY;
+      try{ svg.setPointerCapture(e.pointerId); }catch(_){}
+    });
+    svg.addEventListener('pointermove', e=>{
+      if(!dragging) return;
+      const dx=e.clientX-lastX, dy=e.clientY-lastY;
+      const r=svg.getBoundingClientRect();
+      mapView.tx += dx/r.width*360;
+      mapView.ty += dy/r.height*180;
+      lastX=e.clientX; lastY=e.clientY;
+      clampMap(); applyMapView(svg);
+    });
+    const endDrag=()=>{ dragging=false; };
+    svg.addEventListener('pointerup', endDrag);
+    svg.addEventListener('pointercancel', endDrag);
+    let pinchDist=0;
+    svg.addEventListener('touchstart', e=>{ if(e.touches.length===2) pinchDist=touchDist(e); }, {passive:true});
+    svg.addEventListener('touchmove', e=>{
+      if(e.touches.length===2 && pinchDist>0){
+        const d=touchDist(e);
+        if(pinchDist>0) zoomMap(svg, d/pinchDist);
+        pinchDist=d;
+      }
+    }, {passive:true});
+    svg.addEventListener('touchend', ()=>{ pinchDist=0; }, {passive:true});
   }
 
   /* 新增/編輯城市（含 EXIF 讀取） */
@@ -1741,7 +1840,8 @@ window.initModules = function(){
           const cat = cats.find(c=>c.id===(b.cat||'want'));
           return `<div class="book" data-id="${b.id}">
             <h4>${esc(b.title||'未命名')}</h4>
-            <div class="by">${esc(b.author||'作者不詳')} · ${fmtDate(b.date)} ${cat?`· <span class="cat-tag">${esc(cat.name)}</span>`:''}</div>
+            <div class="by">${esc(b.author||'作者不詳')} · ${fmtDate(b.date)}${cat?` · <span class="cat-tag">${esc(cat.name)}</span>`:''}</div>
+            ${bookPeriodLine(b)}
             <div class="note">${esc(b.note||'（尚無心得）')}</div>
             <div class="ops">
               <button class="btn ghost sm" onclick="WB._editBook('${b.id}')">編輯</button>
@@ -1782,7 +1882,18 @@ window.initModules = function(){
         <select id="bCat" style="background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:11px 12px;font-size:14px;width:100%">
           ${catOpts || '<option value="want">待看</option>'}
         </select>
-        <label class="fld">完成日期</label>
+        <div class="fld-row">
+          <div class="fld-half">
+            <label class="fld">開始閱讀</label>
+            <input type="date" id="bStart" value="${editing?esc(editing.dateStart||''):''}" style="background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:11px 12px;font-size:14px;width:100%"/>
+          </div>
+          <div class="fld-half">
+            <label class="fld">看完日期</label>
+            <input type="date" id="bEnd" value="${editing?esc(editing.dateEnd||editing.date||''):''}" style="background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:11px 12px;font-size:14px;width:100%"/>
+          </div>
+        </div>
+        <div class="book-days" id="bDaysHint"></div>
+        <label class="fld">完成日期（排序用）</label>
         <input type="date" id="bDate" value="${editing?esc(editing.date||''):new Date().toISOString().slice(0,10)}" style="background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:11px 12px;font-size:14px;width:100%"/>
         <label class="fld">心得感想</label>
         <textarea id="bNote" placeholder="最喜歡的角色、一句戳中你的話、讀後心情…">${editing?esc(editing.note):''}</textarea>
@@ -1790,6 +1901,21 @@ window.initModules = function(){
           <button class="btn" onclick="WB._saveBook('${id||''}')">${editing?'儲存':'加入書單'}</button>
         </div>
       </div></div>`;
+    updateBookDaysHint();
+    const s=$('#bStart'), e=$('#bEnd');
+    if(s) s.onchange=updateBookDaysHint;
+    if(e) e.onchange=updateBookDaysHint;
+  }
+  function updateBookDaysHint(){
+    const hint=$('#bDaysHint'); if(!hint) return;
+    const s=$('#bStart'), e=$('#bEnd');
+    if(!s || !e){ hint.textContent=''; return; }
+    const sv=s.value, ev=e.value;
+    if(!sv || !ev){ hint.textContent=''; hint.className='book-days'; return; }
+    if(ev < sv){ hint.textContent='⚠️ 看完日期不能早於開始日期'; hint.className='book-days err'; return; }
+    const days=Math.round((new Date(ev)-new Date(sv))/86400000)+1;
+    hint.textContent=`📅 共 ${days} 天${days===1?'（當天看完）':''}`;
+    hint.className='book-days';
   }
   WB._saveBook=function(id){
     const title=$('#bTitle').value.trim();
@@ -1797,14 +1923,37 @@ window.initModules = function(){
     const date=$('#bDate').value;
     const note=$('#bNote').value.trim();
     const cat=$('#bCat').value;
+    const dateStart=$('#bStart').value;
+    const dateEnd=$('#bEnd').value;
     if(!title){ WB.toast('請填寫書名'); return; }
+    if(dateStart && dateEnd && dateEnd < dateStart){ WB.toast('看完日期不能早於開始日期'); return; }
+    const rec = {title,author,date,note,cat,dateStart,dateEnd};
     if(id){
-      Object.assign(WB.DB.books.find(x=>x.id===id),{title,author,date,note,cat});
+      Object.assign(WB.DB.books.find(x=>x.id===id), rec);
     }else{
-      WB.DB.books.push({id:WB.uid(),title,author,date,note,cat});
+      WB.DB.books.push(Object.assign({id:WB.uid()}, rec));
     }
     WB.save(); WB._closeModal(); WB.go('books'); WB.toast('✅ 已儲存');
   };
+  // 計算閱讀天數
+  function bookDays(b){
+    const s=b.dateStart, e=b.dateEnd||b.date;
+    if(!s || !e) return null;
+    if(e < s) return null;
+    const a=new Date(s), z=new Date(e);
+    return Math.round((z-a)/86400000)+1; // 含首尾
+  }
+  // 書卡上的閱讀期間一行
+  function bookPeriodLine(b){
+    const s=b.dateStart, e=b.dateEnd||b.date;
+    if(!s && !e) return '';
+    const days = bookDays(b);
+    if(s && e){
+      return `<div class="period">📅 ${fmtDate(s)} → ${fmtDate(e)}${days?` · 共 <b>${days}</b> 天`:''}</div>`;
+    }
+    if(e){ return `<div class="period">📅 看完於 ${fmtDate(e)}</div>`; }
+    return `<div class="period">📅 開始於 ${fmtDate(s)}</div>`;
+  }
 
   WB._closeModal=function(){ $('#modalRoot').innerHTML=''; };
 
